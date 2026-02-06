@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>unhinged listings</title>
+<meta name="description" content="where mundane commerce meets existential dread">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 13px;
+  background-color: #ffffff;
+  color: #000000;
+  line-height: 1.3;
+}
+
+a { color: #0000EE; text-decoration: underline; cursor: pointer; }
+a:hover { text-decoration: underline; }
+
+input, select, textarea {
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12px;
+  border: 1px solid #999999;
+  padding: 4px;
+}
+
+textarea { resize: vertical; }
+
+.craigslist-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 10px;
+}
+
+/* Header */
+.craigslist-header {
+  border-bottom: 1px solid #cccccc;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+.craigslist-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #000000;
+  text-decoration: none;
+}
+.craigslist-title:visited { color: #000000; }
+.craigslist-subtitle {
+  font-size: 14px;
+  color: #666666;
+  margin: 5px 0;
+}
+
+/* Nav */
+.craigslist-nav {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  padding: 8px;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.craigslist-nav a { margin-right: 15px; }
+
+/* Category Filter */
+.category-filter {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  padding: 10px;
+  margin: 10px 0;
+  font-size: 12px;
+}
+.category-filter select { margin-left: 5px; }
+
+/* Layout */
+.main-layout { display: flex; gap: 20px; }
+.sidebar { width: 200px; font-size: 12px; flex-shrink: 0; }
+.sidebar-box {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+.sidebar-box strong { display: block; margin-bottom: 8px; }
+.sidebar-links { line-height: 1.8; }
+.sidebar-links a { display: block; color: #0000EE; }
+.sidebar-links a.active { color: #cc0000; }
+.safety-tips { font-size: 11px; line-height: 1.5; }
+.content { flex: 1; min-width: 0; }
+.content-intro { margin-bottom: 15px; }
+.content-intro .tagline { font-size: 11px; color: #666666; }
+
+/* Listing Rows */
+.listing-row {
+  border-bottom: 1px solid #eeeeee;
+  padding: 8px 0;
+  display: flex;
+  align-items: flex-start;
+}
+.listing-image {
+  width: 100px;
+  height: 75px;
+  object-fit: cover;
+  border: 1px solid #cccccc;
+  margin-right: 10px;
+  flex-shrink: 0;
+  background-color: #f0f0f0;
+}
+.listing-info { flex: 1; }
+.listing-title { font-size: 14px; font-weight: bold; margin: 0 0 3px 0; }
+.listing-title a { color: #0000EE; }
+.listing-meta { font-size: 11px; color: #666666; margin: 2px 0; }
+.listing-excerpt { font-size: 12px; margin: 5px 0; line-height: 1.4; }
+.listing-actions { font-size: 11px; margin-top: 5px; }
+
+/* Status */
+.status-available { color: #006600; font-weight: bold; }
+.status-sold { color: #cc0000; font-weight: bold; }
+.status-out-of-stock { color: #cc6600; font-weight: bold; }
+
+/* Listing Detail */
+.listing-detail { max-width: 800px; margin: 0 auto; padding: 20px 0; }
+.listing-detail-title { font-size: 20px; font-weight: bold; margin: 0 0 10px 0; }
+.listing-detail-meta {
+  border-bottom: 1px solid #cccccc;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+.listing-detail-meta table { font-size: 12px; width: 100%; border-collapse: collapse; }
+.listing-detail-meta td { padding: 2px 0; }
+.listing-detail-meta td:first-child { padding-right: 20px; width: 120px; }
+.listing-detail-layout { display: flex; gap: 20px; align-items: flex-start; }
+.listing-detail-image { max-width: 400px; width: 100%; height: auto; border: 1px solid #cccccc; }
+.listing-detail-description {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  padding: 15px;
+  white-space: pre-wrap;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.contact-box {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  padding: 15px;
+  margin-top: 20px;
+  font-size: 12px;
+}
+.contact-box strong { display: block; margin-bottom: 8px; }
+
+/* About */
+.about-content { max-width: 800px; margin: 0 auto; padding: 20px 0; }
+.about-content h1 { font-size: 18px; margin-bottom: 15px; }
+.about-box {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+.about-warning {
+  background-color: #ffffcc;
+  border: 1px solid #cccc00;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+.about-content ul { margin-left: 20px; line-height: 1.6; }
+.about-content .section { margin-bottom: 20px; }
+
+/* Admin */
+.admin-container { max-width: 800px; margin: 0 auto; padding: 20px 0; }
+.admin-container h1 { font-size: 18px; margin-bottom: 15px; }
+.admin-login {
+  background-color: #f8f8f8;
+  border: 1px solid #cccccc;
+  padding: 20px;
+  max-width: 400px;
+  margin: 40px auto;
+}
+.admin-login h2 { font-size: 16px; margin-bottom: 15px; }
+
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 12px; }
+.form-group input,
+.form-group select,
+.form-group textarea { width: 100%; padding: 6px; }
+.form-group textarea { min-height: 200px; }
+
+.btn {
+  background-color: #f0f0f0;
+  border: 1px solid #999999;
+  padding: 6px 16px;
+  font-family: "Times New Roman", Times, serif;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn:hover { background-color: #e0e0e0; }
+.btn-danger { color: #cc0000; }
+.btn-primary { font-weight: bold; }
+
+.admin-listing-row {
+  border-bottom: 1px solid #eeeeee;
+  padding: 8px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.admin-listing-row .actions a { margin-left: 10px; }
+
+.msg-success { color: #006600; margin: 10px 0; font-size: 12px; }
+.msg-error { color: #cc0000; margin: 10px 0; font-size: 12px; }
+
+/* Footer */
+.craigslist-footer {
+  border-top: 1px solid #cccccc;
+  margin-top: 30px;
+  padding-top: 10px;
+  font-size: 11px;
+  color: #666666;
+  text-align: center;
+}
+.craigslist-footer .footer-links { font-size: 10px; }
+
+/* Page nav */
+.page-nav {
+  margin-top: 30px;
+  padding-top: 15px;
+  border-top: 1px solid #cccccc;
+  font-size: 12px;
+}
+
+.not-found { padding: 40px 20px; text-align: center; }
+.not-found h2 { font-size: 16px; color: #cc0000; margin-bottom: 10px; }
+
+.loading { padding: 20px; text-align: center; font-size: 13px; }
+
+@media (max-width: 700px) {
+  .main-layout { flex-direction: column; }
+  .sidebar { width: 100%; }
+  .listing-detail-layout { flex-direction: column; }
+  .listing-detail-image { max-width: 100%; }
+  .listing-image { width: 80px; height: 60px; }
+}
+</style>
+</head>
+<body>
+
+<div id="app" class="craigslist-container"></div>
+
+<script>
+// ===== API =====
+const API = '/api';
+
+async function apiGet(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(`API error ${r.status}`);
+  return r.json();
+}
+
+async function apiPost(path, data, password) {
+  const url = password ? `${API}${path}?password=${encodeURIComponent(password)}` : `${API}${path}`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `API error ${r.status}`); }
+  return r.json();
+}
+
+async function apiPut(path, data, password) {
+  const r = await fetch(`${API}${path}?password=${encodeURIComponent(password)}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `API error ${r.status}`); }
+  return r.json();
+}
+
+async function apiDelete(path, password) {
+  const r = await fetch(`${API}${path}?password=${encodeURIComponent(password)}`, { method: 'DELETE' });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `API error ${r.status}`); }
+  return r.json();
+}
+
+// ===== HELPERS =====
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function formatDate(d) {
+  try { return new Date(d).toLocaleDateString(); } catch { return d; }
+}
+
+function statusClass(status) {
+  if (status === 'In Stock') return 'status-available';
+  if (status === 'Sold') return 'status-sold';
+  if (status === 'Out of Stock') return 'status-out-of-stock';
+  return '';
+}
+
+function statusText(status) {
+  if (status === 'In Stock') return 'AVAILABLE';
+  if (status === 'Sold') return 'SOLD';
+  if (status === 'Out of Stock') return 'OUT OF STOCK';
+  return status ? status.toUpperCase() : '';
+}
+
+const categories = [
+  {id: 'all', name: 'All Listings'},
+  {id: 'household', name: 'Household Items'},
+  {id: 'furniture', name: 'Furniture'},
+  {id: 'tools', name: 'Tools & Equipment'},
+  {id: 'vintage', name: 'Vintage & Collectibles'},
+];
+
+// ===== TEMPLATES =====
+function headerHTML(subtitle) {
+  return `
+    <div class="craigslist-header">
+      <a href="#/" class="craigslist-title">unhinged listings</a>
+      <div class="craigslist-subtitle">${subtitle || 'colorado springs &gt; for sale / wanted &gt; general for sale'}</div>
+    </div>`;
+}
+
+function navHTML(extra) {
+  return `
+    <div class="craigslist-nav">
+      <a href="#/">home</a>
+      <a href="#/about">about</a>
+      <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer">live marketplace</a>
+      ${extra || ''}
+      <span style="float:right;font-size:11px">search tips | posting guidelines</span>
+    </div>`;
+}
+
+function footerHTML() {
+  return `
+    <div class="craigslist-footer">
+      &copy; 2024 unhinged listings | all rights reserved to question reality through commerce<br>
+      <span class="footer-links">
+        help | safety | privacy | feedback | craigslist blog | best of craigslist | existential crisis support
+      </span>
+    </div>`;
+}
+
+// ===== PAGES =====
+
+// --- HOME PAGE ---
+async function renderHome() {
+  const app = document.getElementById('app');
+  const hash = location.hash;
+  const catMatch = hash.match(/[?&]cat=([^&]+)/);
+  let selectedCat = catMatch ? decodeURIComponent(catMatch[1]) : 'all';
+
+  app.innerHTML = headerHTML() + navHTML() + `<div class="loading">loading listings...</div>` + footerHTML();
+
+  let listings = [];
+  try {
+    const catParam = selectedCat !== 'all' ? `?category=${encodeURIComponent(selectedCat)}` : '';
+    listings = await apiGet('/listings' + catParam);
+  } catch (e) {
+    app.innerHTML = headerHTML() + navHTML() +
+      `<div style="padding:20px;text-align:center;color:#cc0000">failed to load listings. the void has consumed the database.</div>` +
+      footerHTML();
+    return;
+  }
+
+  const sidebarLinks = categories.map(c =>
+    `<a href="#/?cat=${c.id}" class="${selectedCat === c.id ? 'active' : ''}">${c.name.toLowerCase()}</a>`
+  ).join('');
+
+  const catOptions = categories.map(c =>
+    `<option value="${c.id}" ${selectedCat === c.id ? 'selected' : ''}>${c.name.toLowerCase()}</option>`
+  ).join('');
+
+  const listingsHTML = listings.length > 0 ? listings.map(l => `
+    <div class="listing-row">
+      ${l.image ? `<img src="${esc(l.image)}" alt="${esc(l.title)}" class="listing-image" onerror="this.style.display='none'">` : ''}
+      <div class="listing-info">
+        <div class="listing-title">
+          <a href="#/listing/${l.id}">$${l.price} - ${esc(l.title)}</a>
+          <span class="${statusClass(l.status)}" style="margin-left:10px;font-size:11px">(${l.status.toLowerCase()})</span>
+        </div>
+        <div class="listing-meta">${esc(l.location)} - ${formatDate(l.postedDate)}</div>
+        <div class="listing-excerpt">${esc(l.excerpt)}</div>
+        <div class="listing-actions">
+          <a href="#/listing/${l.id}">read full description</a> |
+          <a href="${esc(l.facebookUrl)}" target="_blank" rel="noopener noreferrer"> view on facebook</a>
+        </div>
+      </div>
+    </div>
+  `).join('') : `
+    <div style="padding:20px;text-align:center;color:#666666">
+      no listings found in this category.<br>the void has consumed everything.
+    </div>`;
+
+  app.innerHTML = headerHTML() + navHTML() + `
+    <div class="category-filter">
+      <strong>category:</strong>
+      <select id="catSelect">${catOptions}</select>
+      <span style="margin-left:20px;font-size:11px;color:#666666">(${listings.length} listing${listings.length !== 1 ? 's' : ''})</span>
+    </div>
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-box">
+          <strong>for sale categories</strong>
+          <div class="sidebar-links">${sidebarLinks}</div>
+        </div>
+        <div class="sidebar-box">
+          <strong>safety tips</strong>
+          <div class="safety-tips">
+            &bull; meet in public places<br>
+            &bull; don't wire money<br>
+            &bull; avoid offers that seem too good<br>
+            &bull; beware of existential dread
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="content-intro">
+          <strong>UNHINGED LISTINGS</strong> - where mundane commerce meets existential dread<br>
+          <span class="tagline">real items for sale, written through the lens of late-stage capitalism and fourth-wall-breaking nihilism</span>
+        </div>
+        ${listingsHTML}
+      </div>
+    </div>
+  ` + footerHTML();
+
+  document.getElementById('catSelect').addEventListener('change', function() {
+    location.hash = '#/?cat=' + this.value;
+  });
+}
+
+// --- LISTING DETAIL ---
+async function renderListing(id) {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML() + navHTML() + `<div class="loading">loading listing...</div>` + footerHTML();
+
+  let listing;
+  try {
+    listing = await apiGet('/listings/' + id);
+  } catch (e) {
+    app.innerHTML = headerHTML() + navHTML() + `
+      <div class="not-found">
+        <h2>listing not found</h2>
+        <p>this item has vanished into the void of consumer capitalism.</p>
+        <a href="#/">&larr; return to main listings</a>
+      </div>` + footerHTML();
+    return;
+  }
+
+  app.innerHTML = headerHTML() + `
+    <div class="craigslist-nav">
+      <a href="#/">&larr; back to listings</a>
+      <a href="#/about">about</a>
+      <a href="${esc(listing.facebookUrl)}" target="_blank" rel="noopener noreferrer">view on facebook marketplace</a>
+      <span style="float:right;font-size:11px">search tips | posting guidelines</span>
+    </div>
+    <div class="listing-detail">
+      <div class="listing-detail-title">$${listing.price} - ${esc(listing.title)}</div>
+      <div class="listing-detail-meta">
+        <table><tbody>
+          <tr><td><strong>status:</strong></td><td class="${statusClass(listing.status)}"><strong>${statusText(listing.status)}</strong></td></tr>
+          <tr><td><strong>location:</strong></td><td>${esc(listing.location)}</td></tr>
+          <tr><td><strong>posted:</strong></td><td>${formatDate(listing.postedDate)}</td></tr>
+          <tr><td><strong>category:</strong></td><td>${esc(listing.category)}</td></tr>
+        </tbody></table>
+      </div>
+      <div class="listing-detail-layout">
+        ${listing.image ? `<div><img src="${esc(listing.image)}" alt="${esc(listing.title)}" class="listing-detail-image" onerror="this.style.display='none'"></div>` : ''}
+        <div style="flex:1">
+          <div class="listing-detail-description">${esc(listing.fullText)}</div>
+        </div>
+      </div>
+      <div class="contact-box">
+        <strong>Contact Information</strong>
+        &bull; <strong>Reply to this ad:</strong> <a href="mailto:seller@example.com">seller@example.com</a><br>
+        &bull; <strong>Facebook Marketplace:</strong> <a href="${esc(listing.facebookUrl)}" target="_blank" rel="noopener noreferrer">view original listing</a><br>
+        &bull; <strong>Phone:</strong> contact through email first<br><br>
+        <em>Serious inquiries only. Cash preferred. Must be able to handle existential conversations about the nature of commerce.</em>
+      </div>
+      <div class="page-nav">
+        <a href="#/">&larr; back to main listings</a> |
+        <a href="#/about"> about this project</a> |
+        <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer"> browse facebook marketplace</a>
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
+// --- ABOUT PAGE ---
+function renderAbout() {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML('colorado springs &gt; for sale / wanted &gt; about this project') + `
+    <div class="craigslist-nav">
+      <a href="#/">&larr; back to listings</a>
+      <a href="#/about">about</a>
+      <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer">live marketplace</a>
+      <span style="float:right;font-size:11px">search tips | posting guidelines</span>
+    </div>
+    <div class="about-content">
+      <h1>About Unhinged Listings</h1>
+
+      <div class="about-box">
+        <strong>What is this project?</strong><br><br>
+        This is an ongoing performance art piece disguised as classified ads. Each listing starts as a real item for sale from my actual home, but transforms into absurdist literature that questions the nature of consumer culture, late-stage capitalism, and the commodification of our lives.
+      </div>
+
+      <div class="section">
+        <strong>The Process:</strong>
+        <ul>
+          <li>Find real item to sell from my home</li>
+          <li>Start writing "normal" classified ad</li>
+          <li>Let nihilistic stream-of-consciousness take over</li>
+          <li>Break fourth wall, question existence</li>
+          <li>Post to Facebook Marketplace as functional ad</li>
+          <li>Archive here as art piece</li>
+        </ul>
+      </div>
+
+      <div class="about-box">
+        <strong>Featured Quote:</strong><br><br>
+        <em>"Full disclosure, this chair does not make you weightless. The laws of universe still apply. I called the manufacturer to complain and they told me that I should shove the chair somewhere inappropriate. I told them I'd already done that but I still wasn't weightless."</em><br>
+        <span style="font-size:11px;color:#666666">&mdash; From the Zero Gravity Chair listing</span>
+      </div>
+
+      <div class="section">
+        <strong>The Writing Style:</strong>
+        <ul>
+          <li><strong>Nihilistic:</strong> Embracing the meaninglessness of consumer culture</li>
+          <li><strong>Stream-of-consciousness:</strong> Letting thoughts spiral naturally</li>
+          <li><strong>Fourth-wall breaking:</strong> Acknowledging the artificial nature of "selling"</li>
+          <li><strong>Ponderous:</strong> Taking simple transactions way too seriously</li>
+          <li><strong>Vulnerable:</strong> Revealing too much about the seller's mental state</li>
+          <li><strong>Absurdist:</strong> Finding humor in the breakdown of normal commerce</li>
+        </ul>
+      </div>
+
+      <div class="about-box">
+        <strong>Philosophy:</strong><br><br>
+        What if classified ads were honest? What if they revealed not just the condition of our possessions, but the condition of our souls? Through intentional existential spirals and absurdist descriptions, these "ads" become literature that questions why we buy, why we sell, and why we pretend any of this makes sense.
+      </div>
+
+      <div class="section">
+        <strong>Authenticity:</strong><br>
+        All items are real and actually for sale. The Facebook Marketplace links lead to the live ads (when active). Some sell, some don't, but all serve as both functional commerce and performance art. The unhinged descriptions are posted exactly as written to actual buyers on Facebook Marketplace.
+      </div>
+
+      <div class="about-warning">
+        <strong>Warning:</strong> Reading these listings may cause existential questioning about the nature of capitalism, the meaning of ownership, and why we accumulate objects only to eventually sell them to strangers on the internet.
+      </div>
+
+      <div class="page-nav">
+        <a href="#/">&larr; back to listings</a> |
+        <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer"> browse facebook marketplace</a>
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
+// --- ADMIN PAGE ---
+let adminPassword = '';
+
+async function renderAdmin() {
+  const app = document.getElementById('app');
+
+  if (!adminPassword) {
+    app.innerHTML = headerHTML('admin') + navHTML() + `
+      <div class="admin-login">
+        <h2>admin login</h2>
+        <div class="form-group">
+          <label>password:</label>
+          <input type="password" id="adminPw" placeholder="enter admin password">
+        </div>
+        <button class="btn btn-primary" id="loginBtn">log in</button>
+        <div id="loginMsg"></div>
+      </div>
+    ` + footerHTML();
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const pw = document.getElementById('adminPw').value;
+      try {
+        await apiPost('/admin/verify', {password: pw});
+        adminPassword = pw;
+        renderAdmin();
+      } catch (e) {
+        document.getElementById('loginMsg').innerHTML = '<div class="msg-error">invalid password. the void rejects you.</div>';
+      }
+    });
+
+    document.getElementById('adminPw').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
+    return;
+  }
+
+  // Logged in — show admin panel
+  app.innerHTML = headerHTML('admin panel') + navHTML() + `
+    <div class="admin-container">
+      <h1>admin panel <span style="font-size:12px;font-weight:normal">(<a href="#" id="logoutBtn">log out</a>)</span></h1>
+      <div style="margin-bottom:20px">
+        <button class="btn btn-primary" id="newListingBtn">+ new listing</button>
+      </div>
+      <div id="adminListings"><div class="loading">loading...</div></div>
+      <div id="adminForm" style="display:none"></div>
+    </div>
+  ` + footerHTML();
+
+  document.getElementById('logoutBtn').addEventListener('click', (e) => {
+    e.preventDefault();
+    adminPassword = '';
+    renderAdmin();
+  });
+
+  document.getElementById('newListingBtn').addEventListener('click', () => showListingForm());
+
+  // Load listings
+  try {
+    const listings = await apiGet('/listings');
+    const container = document.getElementById('adminListings');
+    if (listings.length === 0) {
+      container.innerHTML = '<div style="color:#666;padding:10px">no listings yet. add one above.</div>';
+      return;
+    }
+    container.innerHTML = listings.map(l => `
+      <div class="admin-listing-row">
+        <div>
+          <strong>${esc(l.title)}</strong> — $${l.price}
+          <span class="${statusClass(l.status)}" style="font-size:11px;margin-left:5px">(${l.status})</span>
+        </div>
+        <div class="actions">
+          <a href="#" class="edit-btn" data-id="${l.id}">edit</a>
+          <a href="#" class="delete-btn btn-danger" data-id="${l.id}" data-title="${esc(l.title)}">delete</a>
+        </div>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.edit-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const listing = await apiGet('/listings/' + btn.dataset.id);
+        showListingForm(listing);
+      });
+    });
+
+    container.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (confirm(`Delete "${btn.dataset.title}"? This cannot be undone.`)) {
+          try {
+            await apiDelete('/admin/listings/' + btn.dataset.id, adminPassword);
+            renderAdmin();
+          } catch (err) {
+            alert('Delete failed: ' + err.message);
+          }
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById('adminListings').innerHTML = `<div class="msg-error">failed to load listings: ${esc(e.message)}</div>`;
+  }
+}
+
+function showListingForm(existing) {
+  const isEdit = !!existing;
+  const form = document.getElementById('adminForm');
+  form.style.display = 'block';
+  document.getElementById('adminListings').style.display = 'none';
+  document.getElementById('newListingBtn').style.display = 'none';
+
+  const catOptions = categories.filter(c => c.id !== 'all').map(c =>
+    `<option value="${c.id}" ${existing && existing.category === c.id ? 'selected' : ''}>${c.name}</option>`
+  ).join('');
+
+  const statusOptions = ['In Stock', 'Sold', 'Out of Stock'].map(s =>
+    `<option value="${s}" ${existing && existing.status === s ? 'selected' : ''}>${s}</option>`
+  ).join('');
+
+  form.innerHTML = `
+    <h2 style="font-size:16px;margin-bottom:15px">${isEdit ? 'Edit' : 'New'} Listing</h2>
+    <div class="form-group">
+      <label>Title:</label>
+      <input type="text" id="f_title" value="${existing ? esc(existing.title) : ''}">
+    </div>
+    <div class="form-group">
+      <label>Price ($):</label>
+      <input type="number" id="f_price" step="0.01" value="${existing ? existing.price : ''}">
+    </div>
+    <div class="form-group">
+      <label>Category:</label>
+      <select id="f_category">${catOptions}</select>
+    </div>
+    <div class="form-group">
+      <label>Status:</label>
+      <select id="f_status">${statusOptions}</select>
+    </div>
+    <div class="form-group">
+      <label>Location:</label>
+      <input type="text" id="f_location" value="${existing ? esc(existing.location) : 'Colorado Springs, CO'}">
+    </div>
+    <div class="form-group">
+      <label>Image URL:</label>
+      <input type="text" id="f_image" value="${existing ? esc(existing.image) : ''}" placeholder="https://...">
+    </div>
+    <div class="form-group">
+      <label>Facebook Marketplace URL:</label>
+      <input type="text" id="f_facebookUrl" value="${existing ? esc(existing.facebookUrl) : ''}" placeholder="https://facebook.com/marketplace/...">
+    </div>
+    <div class="form-group">
+      <label>Excerpt (short preview):</label>
+      <textarea id="f_excerpt" style="min-height:80px">${existing ? esc(existing.excerpt) : ''}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Full Text (the unhinged description):</label>
+      <textarea id="f_fullText">${existing ? esc(existing.fullText) : ''}</textarea>
+    </div>
+    <div style="margin-top:15px">
+      <button class="btn btn-primary" id="saveBtn">${isEdit ? 'Save Changes' : 'Create Listing'}</button>
+      <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
+    </div>
+    <div id="formMsg"></div>
+  `;
+
+  document.getElementById('cancelBtn').addEventListener('click', () => {
+    form.style.display = 'none';
+    document.getElementById('adminListings').style.display = '';
+    document.getElementById('newListingBtn').style.display = '';
+  });
+
+  document.getElementById('saveBtn').addEventListener('click', async () => {
+    const data = {
+      title: document.getElementById('f_title').value.trim(),
+      price: parseFloat(document.getElementById('f_price').value) || 0,
+      category: document.getElementById('f_category').value,
+      status: document.getElementById('f_status').value,
+      location: document.getElementById('f_location').value.trim(),
+      image: document.getElementById('f_image').value.trim(),
+      facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
+      excerpt: document.getElementById('f_excerpt').value.trim(),
+      fullText: document.getElementById('f_fullText').value.trim(),
+    };
+
+    if (!data.title || !data.excerpt || !data.fullText) {
+      document.getElementById('formMsg').innerHTML = '<div class="msg-error">title, excerpt, and full text are required. even the void has standards.</div>';
+      return;
+    }
+
+    try {
+      if (isEdit) {
+        await apiPut('/admin/listings/' + existing.id, data, adminPassword);
+      } else {
+        await apiPost('/admin/listings', data, adminPassword);
+      }
+      renderAdmin();
+    } catch (err) {
+      document.getElementById('formMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+    }
+  });
+}
+
+
+// ===== ROUTER =====
+function route() {
+  const hash = location.hash || '#/';
+  const path = hash.split('?')[0];
+
+  if (path === '#/' || path === '#') {
+    renderHome();
+  } else if (path.startsWith('#/listing/')) {
+    const id = path.replace('#/listing/', '');
+    renderListing(id);
+  } else if (path === '#/about') {
+    renderAbout();
+  } else if (path === '#/admin') {
+    renderAdmin();
+  } else {
+    renderHome();
+  }
+
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener('hashchange', route);
+window.addEventListener('DOMContentLoaded', () => {
+  if (!location.hash) location.hash = '#/';
+  route();
+});
+</script>
+
+</body>
+</html>
