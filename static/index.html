@@ -667,6 +667,42 @@ async function renderAdmin() {
   }
 }
 
+// Auto-extract fields from pasted ad text
+function autoExtract(fullText) {
+  const lines = fullText.trim().split('\n').filter(l => l.trim());
+
+  // Title: first non-empty line
+  let title = lines[0] || 'Untitled Listing';
+  // Clean up common prefixes
+  title = title.replace(/^(condition|listed|home improvement|brand|for sale)[:\s-]*/i, '').trim();
+  if (title.length > 80) title = title.substring(0, 80) + '...';
+
+  // Price: find dollar amounts like $15, $150, $40
+  let price = 0;
+  const priceMatch = fullText.match(/\$\s?(\d+(?:\.\d{2})?)/);
+  if (priceMatch) price = parseFloat(priceMatch[1]);
+
+  // Excerpt: first ~200 meaningful characters
+  let excerpt = '';
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    // Skip short metadata-like lines
+    if (line.match(/^(condition|listed|brand|home improvement|for sale)[:\s]/i)) continue;
+    if (line.length < 15) continue;
+    excerpt = line;
+    if (excerpt.length > 200) excerpt = excerpt.substring(0, 200) + '...';
+    break;
+  }
+  if (!excerpt && lines.length > 0) excerpt = lines[0].substring(0, 200);
+
+  // Location: look for city, state pattern
+  let location = 'Colorado Springs, CO';
+  const locMatch = fullText.match(/(?:in|from|near)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,?\s*[A-Z]{2})/);
+  if (locMatch) location = locMatch[1].trim();
+
+  return { title, price, excerpt, location };
+}
+
 function showListingForm(existing) {
   const isEdit = !!existing;
   const form = document.getElementById('adminForm');
@@ -682,86 +718,172 @@ function showListingForm(existing) {
     `<option value="${s}" ${existing && existing.status === s ? 'selected' : ''}>${s}</option>`
   ).join('');
 
-  form.innerHTML = `
-    <h2 style="font-size:16px;margin-bottom:15px">${isEdit ? 'Edit' : 'New'} Listing</h2>
-    <div class="form-group">
-      <label>Title:</label>
-      <input type="text" id="f_title" value="${existing ? esc(existing.title) : ''}">
-    </div>
-    <div class="form-group">
-      <label>Price ($):</label>
-      <input type="number" id="f_price" step="0.01" value="${existing ? existing.price : ''}">
-    </div>
-    <div class="form-group">
-      <label>Category:</label>
-      <select id="f_category">${catOptions}</select>
-    </div>
-    <div class="form-group">
-      <label>Status:</label>
-      <select id="f_status">${statusOptions}</select>
-    </div>
-    <div class="form-group">
-      <label>Location:</label>
-      <input type="text" id="f_location" value="${existing ? esc(existing.location) : 'Colorado Springs, CO'}">
-    </div>
-    <div class="form-group">
-      <label>Image URL:</label>
-      <input type="text" id="f_image" value="${existing ? esc(existing.image) : ''}" placeholder="https://...">
-    </div>
-    <div class="form-group">
-      <label>Facebook Marketplace URL:</label>
-      <input type="text" id="f_facebookUrl" value="${existing ? esc(existing.facebookUrl) : ''}" placeholder="https://facebook.com/marketplace/...">
-    </div>
-    <div class="form-group">
-      <label>Excerpt (short preview):</label>
-      <textarea id="f_excerpt" style="min-height:80px">${existing ? esc(existing.excerpt) : ''}</textarea>
-    </div>
-    <div class="form-group">
-      <label>Full Text (the unhinged description):</label>
-      <textarea id="f_fullText">${existing ? esc(existing.fullText) : ''}</textarea>
-    </div>
-    <div style="margin-top:15px">
-      <button class="btn btn-primary" id="saveBtn">${isEdit ? 'Save Changes' : 'Create Listing'}</button>
-      <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
-    </div>
-    <div id="formMsg"></div>
-  `;
+  if (!isEdit) {
+    // === SIMPLE NEW LISTING FORM ===
+    form.innerHTML = `
+      <h2 style="font-size:16px;margin-bottom:15px">New Listing</h2>
+      <p style="font-size:12px;color:#666;margin-bottom:15px">Paste 3 things and you're done. Title, price, excerpt, and location are auto-extracted from your ad text.</p>
+      <div class="form-group">
+        <label>Facebook Marketplace URL:</label>
+        <input type="text" id="f_facebookUrl" placeholder="https://www.facebook.com/marketplace/item/...">
+      </div>
+      <div class="form-group">
+        <label>Paste your full ad text:</label>
+        <textarea id="f_fullText" placeholder="Just copy-paste your entire Facebook Marketplace ad here. The title, price, and excerpt will be pulled from it automatically."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Category:</label>
+        <select id="f_category">${catOptions}</select>
+      </div>
+      <div class="form-group">
+        <label>Image URL (optional):</label>
+        <input type="text" id="f_image" placeholder="https://... (right-click image > copy image address)">
+      </div>
+      <hr style="margin:20px 0;border:none;border-top:1px solid #ccc">
+      <div style="background:#f8f8f8;border:1px solid #ccc;padding:10px;margin-bottom:15px">
+        <strong style="font-size:12px">Preview (auto-extracted):</strong>
+        <div id="preview" style="font-size:12px;margin-top:8px;color:#666">start typing or paste your ad above...</div>
+      </div>
+      <div style="margin-top:15px">
+        <button class="btn btn-primary" id="saveBtn">Create Listing</button>
+        <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
+      </div>
+      <div id="formMsg"></div>
+    `;
 
-  document.getElementById('cancelBtn').addEventListener('click', () => {
-    form.style.display = 'none';
-    document.getElementById('adminListings').style.display = '';
-    document.getElementById('newListingBtn').style.display = '';
-  });
-
-  document.getElementById('saveBtn').addEventListener('click', async () => {
-    const data = {
-      title: document.getElementById('f_title').value.trim(),
-      price: parseFloat(document.getElementById('f_price').value) || 0,
-      category: document.getElementById('f_category').value,
-      status: document.getElementById('f_status').value,
-      location: document.getElementById('f_location').value.trim(),
-      image: document.getElementById('f_image').value.trim(),
-      facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
-      excerpt: document.getElementById('f_excerpt').value.trim(),
-      fullText: document.getElementById('f_fullText').value.trim(),
-    };
-
-    if (!data.title || !data.excerpt || !data.fullText) {
-      document.getElementById('formMsg').innerHTML = '<div class="msg-error">title, excerpt, and full text are required. even the void has standards.</div>';
-      return;
-    }
-
-    try {
-      if (isEdit) {
-        await apiPut('/admin/listings/' + existing.id, data, adminPassword);
-      } else {
-        await apiPost('/admin/listings', data, adminPassword);
+    // Live preview as they type/paste
+    document.getElementById('f_fullText').addEventListener('input', () => {
+      const text = document.getElementById('f_fullText').value;
+      if (!text.trim()) {
+        document.getElementById('preview').innerHTML = 'start typing or paste your ad above...';
+        return;
       }
-      renderAdmin();
-    } catch (err) {
-      document.getElementById('formMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
-    }
-  });
+      const ex = autoExtract(text);
+      document.getElementById('preview').innerHTML = `
+        <strong>Title:</strong> ${esc(ex.title)}<br>
+        <strong>Price:</strong> $${ex.price}<br>
+        <strong>Excerpt:</strong> ${esc(ex.excerpt)}<br>
+        <strong>Location:</strong> ${esc(ex.location)}
+      `;
+    });
+
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      form.style.display = 'none';
+      document.getElementById('adminListings').style.display = '';
+      document.getElementById('newListingBtn').style.display = '';
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      const fullText = document.getElementById('f_fullText').value.trim();
+      const facebookUrl = document.getElementById('f_facebookUrl').value.trim();
+      const category = document.getElementById('f_category').value;
+      const image = document.getElementById('f_image').value.trim();
+
+      if (!fullText) {
+        document.getElementById('formMsg').innerHTML = '<div class="msg-error">paste your ad text. even the void has standards.</div>';
+        return;
+      }
+
+      const ex = autoExtract(fullText);
+      const data = {
+        title: ex.title,
+        price: ex.price,
+        category: category,
+        status: 'In Stock',
+        location: ex.location,
+        image: image,
+        facebookUrl: facebookUrl,
+        excerpt: ex.excerpt,
+        fullText: fullText,
+      };
+
+      try {
+        await apiPost('/admin/listings', data, adminPassword);
+        renderAdmin();
+      } catch (err) {
+        document.getElementById('formMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+      }
+    });
+
+  } else {
+    // === FULL EDIT FORM (for tweaking existing listings) ===
+    form.innerHTML = `
+      <h2 style="font-size:16px;margin-bottom:15px">Edit Listing</h2>
+      <div class="form-group">
+        <label>Title:</label>
+        <input type="text" id="f_title" value="${esc(existing.title)}">
+      </div>
+      <div class="form-group">
+        <label>Price ($):</label>
+        <input type="number" id="f_price" step="0.01" value="${existing.price}">
+      </div>
+      <div class="form-group">
+        <label>Category:</label>
+        <select id="f_category">${catOptions}</select>
+      </div>
+      <div class="form-group">
+        <label>Status:</label>
+        <select id="f_status">${statusOptions}</select>
+      </div>
+      <div class="form-group">
+        <label>Location:</label>
+        <input type="text" id="f_location" value="${esc(existing.location)}">
+      </div>
+      <div class="form-group">
+        <label>Image URL:</label>
+        <input type="text" id="f_image" value="${esc(existing.image)}" placeholder="https://...">
+      </div>
+      <div class="form-group">
+        <label>Facebook Marketplace URL:</label>
+        <input type="text" id="f_facebookUrl" value="${esc(existing.facebookUrl)}">
+      </div>
+      <div class="form-group">
+        <label>Excerpt (short preview):</label>
+        <textarea id="f_excerpt" style="min-height:80px">${esc(existing.excerpt)}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Full Text:</label>
+        <textarea id="f_fullText">${esc(existing.fullText)}</textarea>
+      </div>
+      <div style="margin-top:15px">
+        <button class="btn btn-primary" id="saveBtn">Save Changes</button>
+        <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
+      </div>
+      <div id="formMsg"></div>
+    `;
+
+    document.getElementById('cancelBtn').addEventListener('click', () => {
+      form.style.display = 'none';
+      document.getElementById('adminListings').style.display = '';
+      document.getElementById('newListingBtn').style.display = '';
+    });
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      const data = {
+        title: document.getElementById('f_title').value.trim(),
+        price: parseFloat(document.getElementById('f_price').value) || 0,
+        category: document.getElementById('f_category').value,
+        status: document.getElementById('f_status').value,
+        location: document.getElementById('f_location').value.trim(),
+        image: document.getElementById('f_image').value.trim(),
+        facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
+        excerpt: document.getElementById('f_excerpt').value.trim(),
+        fullText: document.getElementById('f_fullText').value.trim(),
+      };
+
+      if (!data.title || !data.fullText) {
+        document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and full text are required.</div>';
+        return;
+      }
+
+      try {
+        await apiPut('/admin/listings/' + existing.id, data, adminPassword);
+        renderAdmin();
+      } catch (err) {
+        document.getElementById('formMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+      }
+    });
+  }
 }
 
 
