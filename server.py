@@ -140,13 +140,65 @@ async def get_listing(listing_id: str):
 
 @app.get("/api/categories")
 async def get_categories():
-    return [
+    settings = await db.site_settings.find_one({"_id": "site"})
+    if settings and "categories" in settings:
+        return settings["categories"]
+    return DEFAULT_SETTINGS["categories"]
+
+
+# --- Settings Routes ---
+
+DEFAULT_SETTINGS = {
+    "siteTitle": "unhinged listings",
+    "subtitle": "colorado springs > for sale / wanted > general for sale",
+    "tagline": "where mundane commerce meets existential dread",
+    "description": "real items for sale, written through the lens of late-stage capitalism and fourth-wall-breaking nihilism",
+    "categories": [
         {"id": "all", "name": "All Listings"},
         {"id": "household", "name": "Household Items"},
         {"id": "furniture", "name": "Furniture"},
         {"id": "tools", "name": "Tools & Equipment"},
         {"id": "vintage", "name": "Vintage & Collectibles"},
-    ]
+    ],
+    "safetyTips": "meet in public places\ndon't wire money\navoid offers that seem too good\nbeware of existential dread",
+    "footerText": "unhinged listings | all rights reserved to question reality through commerce",
+    "footerLinks": "help | safety | privacy | feedback | craigslist blog | best of craigslist | existential crisis support",
+    "aboutTitle": "About Unhinged Listings",
+    "aboutIntro": "This is an ongoing performance art piece disguised as classified ads. Each listing starts as a real item for sale from my actual home, but transforms into absurdist literature that questions the nature of consumer culture, late-stage capitalism, and the commodification of our lives.",
+    "aboutProcess": "Find real item to sell from my home\nStart writing \"normal\" classified ad\nLet nihilistic stream-of-consciousness take over\nBreak fourth wall, question existence\nPost to Facebook Marketplace as functional ad\nArchive here as art piece",
+    "aboutQuote": "Full disclosure, this chair does not make you weightless. The laws of universe still apply. I called the manufacturer to complain and they told me that I should shove the chair somewhere inappropriate. I told them I'd already done that but I still wasn't weightless.",
+    "aboutQuoteSource": "From the Zero Gravity Chair listing",
+    "aboutPhilosophy": "What if classified ads were honest? What if they revealed not just the condition of our possessions, but the condition of our souls? Through intentional existential spirals and absurdist descriptions, these \"ads\" become literature that questions why we buy, why we sell, and why we pretend any of this makes sense.",
+    "aboutAuthenticity": "All items are real and actually for sale. The Facebook Marketplace links lead to the live ads (when active). Some sell, some don't, but all serve as both functional commerce and performance art. The unhinged descriptions are posted exactly as written to actual buyers on Facebook Marketplace.",
+    "aboutWarning": "Reading these listings may cause existential questioning about the nature of capitalism, the meaning of ownership, and why we accumulate objects only to eventually sell them to strangers on the internet.",
+    "contactText": "Serious inquiries only. Cash preferred. Must be able to handle existential conversations about the nature of commerce.",
+}
+
+
+@app.get("/api/settings")
+async def get_settings():
+    settings = await db.site_settings.find_one({"_id": "site"})
+    if settings:
+        settings.pop("_id", None)
+        # Fill in any missing keys with defaults
+        for key, val in DEFAULT_SETTINGS.items():
+            if key not in settings:
+                settings[key] = val
+        return settings
+    return DEFAULT_SETTINGS
+
+
+@app.put("/api/admin/settings")
+async def update_settings(request: Request, password: str = Query(...)):
+    verify_admin(password)
+    data = await request.json()
+    data["updatedAt"] = datetime.utcnow().isoformat()
+    await db.site_settings.update_one(
+        {"_id": "site"},
+        {"$set": data},
+        upsert=True
+    )
+    return {"ok": True}
 
 
 # --- Admin Routes ---
