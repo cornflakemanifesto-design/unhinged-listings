@@ -286,11 +286,50 @@ async function apiDelete(path, password) {
   return r.json();
 }
 
+// ===== SETTINGS (loaded once, used everywhere) =====
+let S = null; // site settings
+
+async function loadSettings() {
+  try {
+    S = await apiGet('/settings');
+  } catch (e) {
+    console.error('Failed to load settings, using defaults');
+    S = {
+      siteTitle: 'unhinged listings',
+      subtitle: 'colorado springs > for sale / wanted > general for sale',
+      tagline: 'where mundane commerce meets existential dread',
+      description: 'real items for sale, written through the lens of late-stage capitalism and fourth-wall-breaking nihilism',
+      categories: [
+        {id:'all',name:'All Listings'},{id:'household',name:'Household Items'},
+        {id:'furniture',name:'Furniture'},{id:'tools',name:'Tools & Equipment'},
+        {id:'vintage',name:'Vintage & Collectibles'}
+      ],
+      safetyTips: "meet in public places\ndon't wire money\navoid offers that seem too good\nbeware of existential dread",
+      footerText: 'unhinged listings | all rights reserved to question reality through commerce',
+      footerLinks: 'help | safety | privacy | feedback | craigslist blog | best of craigslist | existential crisis support',
+      aboutTitle: 'About Unhinged Listings',
+      aboutIntro: '',
+      aboutProcess: '',
+      aboutQuote: '',
+      aboutQuoteSource: '',
+      aboutPhilosophy: '',
+      aboutAuthenticity: '',
+      aboutWarning: '',
+      contactText: 'Serious inquiries only. Cash preferred.',
+    };
+  }
+}
+
 // ===== HELPERS =====
 function esc(str) {
+  if (!str) return '';
   const d = document.createElement('div');
   d.textContent = str;
   return d.innerHTML;
+}
+
+function nl2br(str) {
+  return esc(str).replace(/\n/g, '<br>');
 }
 
 function formatDate(d) {
@@ -311,20 +350,12 @@ function statusText(status) {
   return status ? status.toUpperCase() : '';
 }
 
-const categories = [
-  {id: 'all', name: 'All Listings'},
-  {id: 'household', name: 'Household Items'},
-  {id: 'furniture', name: 'Furniture'},
-  {id: 'tools', name: 'Tools & Equipment'},
-  {id: 'vintage', name: 'Vintage & Collectibles'},
-];
-
 // ===== TEMPLATES =====
 function headerHTML(subtitle) {
   return `
     <div class="craigslist-header">
-      <a href="#/" class="craigslist-title">unhinged listings</a>
-      <div class="craigslist-subtitle">${subtitle || 'colorado springs &gt; for sale / wanted &gt; general for sale'}</div>
+      <a href="#/" class="craigslist-title">${esc(S.siteTitle)}</a>
+      <div class="craigslist-subtitle">${esc(subtitle || S.subtitle)}</div>
     </div>`;
 }
 
@@ -342,10 +373,8 @@ function navHTML(extra) {
 function footerHTML() {
   return `
     <div class="craigslist-footer">
-      &copy; 2024 unhinged listings | all rights reserved to question reality through commerce<br>
-      <span class="footer-links">
-        help | safety | privacy | feedback | craigslist blog | best of craigslist | existential crisis support
-      </span>
+      &copy; ${new Date().getFullYear()} ${esc(S.footerText)}<br>
+      <span class="footer-links">${esc(S.footerLinks)}</span>
     </div>`;
 }
 
@@ -357,6 +386,7 @@ async function renderHome() {
   const hash = location.hash;
   const catMatch = hash.match(/[?&]cat=([^&]+)/);
   let selectedCat = catMatch ? decodeURIComponent(catMatch[1]) : 'all';
+  const cats = S.categories || [];
 
   app.innerHTML = headerHTML() + navHTML() + `<div class="loading">loading listings...</div>` + footerHTML();
 
@@ -371,13 +401,15 @@ async function renderHome() {
     return;
   }
 
-  const sidebarLinks = categories.map(c =>
+  const sidebarLinks = cats.map(c =>
     `<a href="#/?cat=${c.id}" class="${selectedCat === c.id ? 'active' : ''}">${c.name.toLowerCase()}</a>`
   ).join('');
 
-  const catOptions = categories.map(c =>
+  const catOptions = cats.map(c =>
     `<option value="${c.id}" ${selectedCat === c.id ? 'selected' : ''}>${c.name.toLowerCase()}</option>`
   ).join('');
+
+  const safetyHTML = (S.safetyTips || '').split('\n').map(t => `&bull; ${esc(t.trim())}`).join('<br>');
 
   const listingsHTML = listings.length > 0 ? listings.map(l => `
     <div class="listing-row">
@@ -414,18 +446,13 @@ async function renderHome() {
         </div>
         <div class="sidebar-box">
           <strong>safety tips</strong>
-          <div class="safety-tips">
-            &bull; meet in public places<br>
-            &bull; don't wire money<br>
-            &bull; avoid offers that seem too good<br>
-            &bull; beware of existential dread
-          </div>
+          <div class="safety-tips">${safetyHTML}</div>
         </div>
       </div>
       <div class="content">
         <div class="content-intro">
-          <strong>UNHINGED LISTINGS</strong> - where mundane commerce meets existential dread<br>
-          <span class="tagline">real items for sale, written through the lens of late-stage capitalism and fourth-wall-breaking nihilism</span>
+          <strong>${esc(S.siteTitle).toUpperCase()}</strong> - ${esc(S.tagline)}<br>
+          <span class="tagline">${esc(S.description)}</span>
         </div>
         ${listingsHTML}
       </div>
@@ -480,10 +507,8 @@ async function renderListing(id) {
       </div>
       <div class="contact-box">
         <strong>Contact Information</strong>
-        &bull; <strong>Reply to this ad:</strong> <a href="mailto:seller@example.com">seller@example.com</a><br>
-        &bull; <strong>Facebook Marketplace:</strong> <a href="${esc(listing.facebookUrl)}" target="_blank" rel="noopener noreferrer">view original listing</a><br>
-        &bull; <strong>Phone:</strong> contact through email first<br><br>
-        <em>Serious inquiries only. Cash preferred. Must be able to handle existential conversations about the nature of commerce.</em>
+        &bull; <strong>Facebook Marketplace:</strong> <a href="${esc(listing.facebookUrl)}" target="_blank" rel="noopener noreferrer">view original listing</a><br><br>
+        <em>${esc(S.contactText)}</em>
       </div>
       <div class="page-nav">
         <a href="#/">&larr; back to main listings</a> |
@@ -496,8 +521,10 @@ async function renderListing(id) {
 
 // --- ABOUT PAGE ---
 function renderAbout() {
+  const processItems = (S.aboutProcess || '').split('\n').filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('');
+
   const app = document.getElementById('app');
-  app.innerHTML = headerHTML('colorado springs &gt; for sale / wanted &gt; about this project') + `
+  app.innerHTML = headerHTML(S.subtitle.replace('general for sale', 'about this project')) + `
     <div class="craigslist-nav">
       <a href="#/">&larr; back to listings</a>
       <a href="#/about">about</a>
@@ -505,56 +532,37 @@ function renderAbout() {
       <span style="float:right;font-size:11px">search tips | posting guidelines</span>
     </div>
     <div class="about-content">
-      <h1>About Unhinged Listings</h1>
+      <h1>${esc(S.aboutTitle)}</h1>
 
       <div class="about-box">
         <strong>What is this project?</strong><br><br>
-        This is an ongoing performance art piece disguised as classified ads. Each listing starts as a real item for sale from my actual home, but transforms into absurdist literature that questions the nature of consumer culture, late-stage capitalism, and the commodification of our lives.
+        ${nl2br(S.aboutIntro)}
       </div>
 
-      <div class="section">
+      ${processItems ? `<div class="section">
         <strong>The Process:</strong>
-        <ul>
-          <li>Find real item to sell from my home</li>
-          <li>Start writing "normal" classified ad</li>
-          <li>Let nihilistic stream-of-consciousness take over</li>
-          <li>Break fourth wall, question existence</li>
-          <li>Post to Facebook Marketplace as functional ad</li>
-          <li>Archive here as art piece</li>
-        </ul>
-      </div>
+        <ul>${processItems}</ul>
+      </div>` : ''}
 
-      <div class="about-box">
+      ${S.aboutQuote ? `<div class="about-box">
         <strong>Featured Quote:</strong><br><br>
-        <em>"Full disclosure, this chair does not make you weightless. The laws of universe still apply. I called the manufacturer to complain and they told me that I should shove the chair somewhere inappropriate. I told them I'd already done that but I still wasn't weightless."</em><br>
-        <span style="font-size:11px;color:#666666">&mdash; From the Zero Gravity Chair listing</span>
-      </div>
+        <em>"${esc(S.aboutQuote)}"</em><br>
+        <span style="font-size:11px;color:#666666">&mdash; ${esc(S.aboutQuoteSource)}</span>
+      </div>` : ''}
 
-      <div class="section">
-        <strong>The Writing Style:</strong>
-        <ul>
-          <li><strong>Nihilistic:</strong> Embracing the meaninglessness of consumer culture</li>
-          <li><strong>Stream-of-consciousness:</strong> Letting thoughts spiral naturally</li>
-          <li><strong>Fourth-wall breaking:</strong> Acknowledging the artificial nature of "selling"</li>
-          <li><strong>Ponderous:</strong> Taking simple transactions way too seriously</li>
-          <li><strong>Vulnerable:</strong> Revealing too much about the seller's mental state</li>
-          <li><strong>Absurdist:</strong> Finding humor in the breakdown of normal commerce</li>
-        </ul>
-      </div>
-
-      <div class="about-box">
+      ${S.aboutPhilosophy ? `<div class="about-box">
         <strong>Philosophy:</strong><br><br>
-        What if classified ads were honest? What if they revealed not just the condition of our possessions, but the condition of our souls? Through intentional existential spirals and absurdist descriptions, these "ads" become literature that questions why we buy, why we sell, and why we pretend any of this makes sense.
-      </div>
+        ${nl2br(S.aboutPhilosophy)}
+      </div>` : ''}
 
-      <div class="section">
+      ${S.aboutAuthenticity ? `<div class="section">
         <strong>Authenticity:</strong><br>
-        All items are real and actually for sale. The Facebook Marketplace links lead to the live ads (when active). Some sell, some don't, but all serve as both functional commerce and performance art. The unhinged descriptions are posted exactly as written to actual buyers on Facebook Marketplace.
-      </div>
+        ${nl2br(S.aboutAuthenticity)}
+      </div>` : ''}
 
-      <div class="about-warning">
-        <strong>Warning:</strong> Reading these listings may cause existential questioning about the nature of capitalism, the meaning of ownership, and why we accumulate objects only to eventually sell them to strangers on the internet.
-      </div>
+      ${S.aboutWarning ? `<div class="about-warning">
+        <strong>Warning:</strong> ${esc(S.aboutWarning)}
+      </div>` : ''}
 
       <div class="page-nav">
         <a href="#/">&larr; back to listings</a> |
@@ -600,17 +608,40 @@ async function renderAdmin() {
     return;
   }
 
-  // Logged in — show admin panel
+  // Logged in — show admin panel with tabs
   app.innerHTML = headerHTML('admin panel') + navHTML() + `
     <div class="admin-container">
       <h1>admin panel <span style="font-size:12px;font-weight:normal">(<a href="#" id="logoutBtn">log out</a>)</span></h1>
-      <div style="margin-bottom:20px">
-        <button class="btn btn-primary" id="newListingBtn">+ new listing</button>
+      <div style="margin-bottom:20px;border-bottom:1px solid #ccc;padding-bottom:10px">
+        <button class="btn" id="tabListings" style="font-weight:bold">Listings</button>
+        <button class="btn" id="tabSettings" style="margin-left:10px">Site Settings</button>
       </div>
-      <div id="adminListings"><div class="loading">loading...</div></div>
-      <div id="adminForm" style="display:none"></div>
+      <div id="adminListingsPanel">
+        <div style="margin-bottom:15px">
+          <button class="btn btn-primary" id="newListingBtn">+ new listing</button>
+        </div>
+        <div id="adminListings"><div class="loading">loading...</div></div>
+        <div id="adminForm" style="display:none"></div>
+      </div>
+      <div id="adminSettingsPanel" style="display:none"></div>
     </div>
   ` + footerHTML();
+
+  // Tab switching
+  document.getElementById('tabListings').addEventListener('click', () => {
+    document.getElementById('adminListingsPanel').style.display = '';
+    document.getElementById('adminSettingsPanel').style.display = 'none';
+    document.getElementById('tabListings').style.fontWeight = 'bold';
+    document.getElementById('tabSettings').style.fontWeight = 'normal';
+  });
+
+  document.getElementById('tabSettings').addEventListener('click', () => {
+    document.getElementById('adminListingsPanel').style.display = 'none';
+    document.getElementById('adminSettingsPanel').style.display = '';
+    document.getElementById('tabListings').style.fontWeight = 'normal';
+    document.getElementById('tabSettings').style.fontWeight = 'bold';
+    renderSettingsForm();
+  });
 
   document.getElementById('logoutBtn').addEventListener('click', (e) => {
     e.preventDefault();
@@ -667,26 +698,180 @@ async function renderAdmin() {
   }
 }
 
+// --- SETTINGS FORM ---
+async function renderSettingsForm() {
+  const panel = document.getElementById('adminSettingsPanel');
+  panel.innerHTML = '<div class="loading">loading settings...</div>';
+
+  let settings;
+  try {
+    settings = await apiGet('/settings');
+  } catch (e) {
+    panel.innerHTML = '<div class="msg-error">failed to load settings</div>';
+    return;
+  }
+
+  // Build categories editor string
+  const catsText = (settings.categories || []).filter(c => c.id !== 'all').map(c => `${c.id}:${c.name}`).join('\n');
+
+  panel.innerHTML = `
+    <h2 style="font-size:16px;margin-bottom:5px">Site Settings</h2>
+    <p style="font-size:11px;color:#666;margin-bottom:15px">Edit any text on your site. Changes appear immediately after saving.</p>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Header & Branding</legend>
+      <div class="form-group">
+        <label>Site Title:</label>
+        <input type="text" id="s_siteTitle" value="${esc(settings.siteTitle)}">
+      </div>
+      <div class="form-group">
+        <label>Subtitle (breadcrumb text):</label>
+        <input type="text" id="s_subtitle" value="${esc(settings.subtitle)}">
+      </div>
+      <div class="form-group">
+        <label>Tagline:</label>
+        <input type="text" id="s_tagline" value="${esc(settings.tagline)}">
+      </div>
+      <div class="form-group">
+        <label>Description (below tagline):</label>
+        <input type="text" id="s_description" value="${esc(settings.description)}">
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Categories</legend>
+      <p style="font-size:11px;color:#666;margin-bottom:8px">One per line, format: <code>id:Display Name</code> (e.g. <code>household:Household Items</code>)</p>
+      <div class="form-group">
+        <textarea id="s_categories" style="min-height:100px">${esc(catsText)}</textarea>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Sidebar</legend>
+      <div class="form-group">
+        <label>Safety Tips (one per line):</label>
+        <textarea id="s_safetyTips" style="min-height:80px">${esc(settings.safetyTips)}</textarea>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">About Page</legend>
+      <div class="form-group">
+        <label>Page Title:</label>
+        <input type="text" id="s_aboutTitle" value="${esc(settings.aboutTitle)}">
+      </div>
+      <div class="form-group">
+        <label>Intro ("What is this project?"):</label>
+        <textarea id="s_aboutIntro" style="min-height:100px">${esc(settings.aboutIntro)}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Process Steps (one per line):</label>
+        <textarea id="s_aboutProcess" style="min-height:80px">${esc(settings.aboutProcess)}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Featured Quote:</label>
+        <textarea id="s_aboutQuote" style="min-height:60px">${esc(settings.aboutQuote)}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Quote Source:</label>
+        <input type="text" id="s_aboutQuoteSource" value="${esc(settings.aboutQuoteSource)}">
+      </div>
+      <div class="form-group">
+        <label>Philosophy:</label>
+        <textarea id="s_aboutPhilosophy" style="min-height:80px">${esc(settings.aboutPhilosophy)}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Authenticity:</label>
+        <textarea id="s_aboutAuthenticity" style="min-height:80px">${esc(settings.aboutAuthenticity)}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Warning:</label>
+        <textarea id="s_aboutWarning" style="min-height:60px">${esc(settings.aboutWarning)}</textarea>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Listing Detail Page</legend>
+      <div class="form-group">
+        <label>Contact Box Text:</label>
+        <textarea id="s_contactText" style="min-height:60px">${esc(settings.contactText)}</textarea>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Footer</legend>
+      <div class="form-group">
+        <label>Footer Text:</label>
+        <input type="text" id="s_footerText" value="${esc(settings.footerText)}">
+      </div>
+      <div class="form-group">
+        <label>Footer Links:</label>
+        <input type="text" id="s_footerLinks" value="${esc(settings.footerLinks)}">
+      </div>
+    </fieldset>
+
+    <div style="margin-top:15px">
+      <button class="btn btn-primary" id="saveSettingsBtn">Save All Settings</button>
+    </div>
+    <div id="settingsMsg"></div>
+  `;
+
+  document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+    // Parse categories
+    const catLines = document.getElementById('s_categories').value.trim().split('\n').filter(l => l.trim());
+    const cats = [{id: 'all', name: 'All Listings'}];
+    for (const line of catLines) {
+      const parts = line.split(':');
+      if (parts.length >= 2) {
+        cats.push({ id: parts[0].trim(), name: parts.slice(1).join(':').trim() });
+      }
+    }
+
+    const data = {
+      siteTitle: document.getElementById('s_siteTitle').value.trim(),
+      subtitle: document.getElementById('s_subtitle').value.trim(),
+      tagline: document.getElementById('s_tagline').value.trim(),
+      description: document.getElementById('s_description').value.trim(),
+      categories: cats,
+      safetyTips: document.getElementById('s_safetyTips').value.trim(),
+      aboutTitle: document.getElementById('s_aboutTitle').value.trim(),
+      aboutIntro: document.getElementById('s_aboutIntro').value.trim(),
+      aboutProcess: document.getElementById('s_aboutProcess').value.trim(),
+      aboutQuote: document.getElementById('s_aboutQuote').value.trim(),
+      aboutQuoteSource: document.getElementById('s_aboutQuoteSource').value.trim(),
+      aboutPhilosophy: document.getElementById('s_aboutPhilosophy').value.trim(),
+      aboutAuthenticity: document.getElementById('s_aboutAuthenticity').value.trim(),
+      aboutWarning: document.getElementById('s_aboutWarning').value.trim(),
+      contactText: document.getElementById('s_contactText').value.trim(),
+      footerText: document.getElementById('s_footerText').value.trim(),
+      footerLinks: document.getElementById('s_footerLinks').value.trim(),
+    };
+
+    try {
+      await apiPut('/admin/settings', data, adminPassword);
+      // Reload settings globally
+      await loadSettings();
+      document.getElementById('settingsMsg').innerHTML = '<div class="msg-success">settings saved! changes are live.</div>';
+    } catch (err) {
+      document.getElementById('settingsMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+    }
+  });
+}
+
 // Auto-extract fields from pasted ad text
 function autoExtract(fullText) {
   const lines = fullText.trim().split('\n').filter(l => l.trim());
-
-  // Title: first non-empty line
   let title = lines[0] || 'Untitled Listing';
-  // Clean up common prefixes
   title = title.replace(/^(condition|listed|home improvement|brand|for sale)[:\s-]*/i, '').trim();
   if (title.length > 80) title = title.substring(0, 80) + '...';
 
-  // Price: find dollar amounts like $15, $150, $40
   let price = 0;
   const priceMatch = fullText.match(/\$\s?(\d+(?:\.\d{2})?)/);
   if (priceMatch) price = parseFloat(priceMatch[1]);
 
-  // Excerpt: first ~200 meaningful characters
   let excerpt = '';
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    // Skip short metadata-like lines
     if (line.match(/^(condition|listed|brand|home improvement|for sale)[:\s]/i)) continue;
     if (line.length < 15) continue;
     excerpt = line;
@@ -695,7 +880,6 @@ function autoExtract(fullText) {
   }
   if (!excerpt && lines.length > 0) excerpt = lines[0].substring(0, 200);
 
-  // Location: look for city, state pattern
   let location = 'Colorado Springs, CO';
   const locMatch = fullText.match(/(?:in|from|near)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,?\s*[A-Z]{2})/);
   if (locMatch) location = locMatch[1].trim();
@@ -710,7 +894,8 @@ function showListingForm(existing) {
   document.getElementById('adminListings').style.display = 'none';
   document.getElementById('newListingBtn').style.display = 'none';
 
-  const catOptions = categories.filter(c => c.id !== 'all').map(c =>
+  const cats = (S.categories || []).filter(c => c.id !== 'all');
+  const catOptions = cats.map(c =>
     `<option value="${c.id}" ${existing && existing.category === c.id ? 'selected' : ''}>${c.name}</option>`
   ).join('');
 
@@ -719,7 +904,6 @@ function showListingForm(existing) {
   ).join('');
 
   if (!isEdit) {
-    // === SIMPLE NEW LISTING FORM ===
     form.innerHTML = `
       <h2 style="font-size:16px;margin-bottom:15px">New Listing</h2>
       <p style="font-size:12px;color:#666;margin-bottom:15px">Paste 3 things and you're done. Title, price, excerpt, and location are auto-extracted from your ad text.</p>
@@ -729,7 +913,7 @@ function showListingForm(existing) {
       </div>
       <div class="form-group">
         <label>Paste your full ad text:</label>
-        <textarea id="f_fullText" placeholder="Just copy-paste your entire Facebook Marketplace ad here. The title, price, and excerpt will be pulled from it automatically."></textarea>
+        <textarea id="f_fullText" placeholder="Just copy-paste your entire Facebook Marketplace ad here."></textarea>
       </div>
       <div class="form-group">
         <label>Category:</label>
@@ -751,13 +935,9 @@ function showListingForm(existing) {
       <div id="formMsg"></div>
     `;
 
-    // Live preview as they type/paste
     document.getElementById('f_fullText').addEventListener('input', () => {
       const text = document.getElementById('f_fullText').value;
-      if (!text.trim()) {
-        document.getElementById('preview').innerHTML = 'start typing or paste your ad above...';
-        return;
-      }
+      if (!text.trim()) { document.getElementById('preview').innerHTML = 'start typing or paste your ad above...'; return; }
       const ex = autoExtract(text);
       document.getElementById('preview').innerHTML = `
         <strong>Title:</strong> ${esc(ex.title)}<br>
@@ -775,28 +955,15 @@ function showListingForm(existing) {
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
       const fullText = document.getElementById('f_fullText').value.trim();
-      const facebookUrl = document.getElementById('f_facebookUrl').value.trim();
-      const category = document.getElementById('f_category').value;
-      const image = document.getElementById('f_image').value.trim();
-
-      if (!fullText) {
-        document.getElementById('formMsg').innerHTML = '<div class="msg-error">paste your ad text. even the void has standards.</div>';
-        return;
-      }
-
+      if (!fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">paste your ad text.</div>'; return; }
       const ex = autoExtract(fullText);
       const data = {
-        title: ex.title,
-        price: ex.price,
-        category: category,
-        status: 'In Stock',
-        location: ex.location,
-        image: image,
-        facebookUrl: facebookUrl,
-        excerpt: ex.excerpt,
-        fullText: fullText,
+        title: ex.title, price: ex.price, category: document.getElementById('f_category').value,
+        status: 'In Stock', location: ex.location,
+        image: document.getElementById('f_image').value.trim(),
+        facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
+        excerpt: ex.excerpt, fullText: fullText,
       };
-
       try {
         await apiPost('/admin/listings', data, adminPassword);
         renderAdmin();
@@ -806,45 +973,17 @@ function showListingForm(existing) {
     });
 
   } else {
-    // === FULL EDIT FORM (for tweaking existing listings) ===
     form.innerHTML = `
       <h2 style="font-size:16px;margin-bottom:15px">Edit Listing</h2>
-      <div class="form-group">
-        <label>Title:</label>
-        <input type="text" id="f_title" value="${esc(existing.title)}">
-      </div>
-      <div class="form-group">
-        <label>Price ($):</label>
-        <input type="number" id="f_price" step="0.01" value="${existing.price}">
-      </div>
-      <div class="form-group">
-        <label>Category:</label>
-        <select id="f_category">${catOptions}</select>
-      </div>
-      <div class="form-group">
-        <label>Status:</label>
-        <select id="f_status">${statusOptions}</select>
-      </div>
-      <div class="form-group">
-        <label>Location:</label>
-        <input type="text" id="f_location" value="${esc(existing.location)}">
-      </div>
-      <div class="form-group">
-        <label>Image URL:</label>
-        <input type="text" id="f_image" value="${esc(existing.image)}" placeholder="https://...">
-      </div>
-      <div class="form-group">
-        <label>Facebook Marketplace URL:</label>
-        <input type="text" id="f_facebookUrl" value="${esc(existing.facebookUrl)}">
-      </div>
-      <div class="form-group">
-        <label>Excerpt (short preview):</label>
-        <textarea id="f_excerpt" style="min-height:80px">${esc(existing.excerpt)}</textarea>
-      </div>
-      <div class="form-group">
-        <label>Full Text:</label>
-        <textarea id="f_fullText">${esc(existing.fullText)}</textarea>
-      </div>
+      <div class="form-group"><label>Title:</label><input type="text" id="f_title" value="${esc(existing.title)}"></div>
+      <div class="form-group"><label>Price ($):</label><input type="number" id="f_price" step="0.01" value="${existing.price}"></div>
+      <div class="form-group"><label>Category:</label><select id="f_category">${catOptions}</select></div>
+      <div class="form-group"><label>Status:</label><select id="f_status">${statusOptions}</select></div>
+      <div class="form-group"><label>Location:</label><input type="text" id="f_location" value="${esc(existing.location)}"></div>
+      <div class="form-group"><label>Image URL:</label><input type="text" id="f_image" value="${esc(existing.image)}"></div>
+      <div class="form-group"><label>Facebook Marketplace URL:</label><input type="text" id="f_facebookUrl" value="${esc(existing.facebookUrl)}"></div>
+      <div class="form-group"><label>Excerpt:</label><textarea id="f_excerpt" style="min-height:80px">${esc(existing.excerpt)}</textarea></div>
+      <div class="form-group"><label>Full Text:</label><textarea id="f_fullText">${esc(existing.fullText)}</textarea></div>
       <div style="margin-top:15px">
         <button class="btn btn-primary" id="saveBtn">Save Changes</button>
         <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
@@ -870,12 +1009,7 @@ function showListingForm(existing) {
         excerpt: document.getElementById('f_excerpt').value.trim(),
         fullText: document.getElementById('f_fullText').value.trim(),
       };
-
-      if (!data.title || !data.fullText) {
-        document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and full text are required.</div>';
-        return;
-      }
-
+      if (!data.title || !data.fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and full text are required.</div>'; return; }
       try {
         await apiPut('/admin/listings/' + existing.id, data, adminPassword);
         renderAdmin();
@@ -886,17 +1020,16 @@ function showListingForm(existing) {
   }
 }
 
-
 // ===== ROUTER =====
-function route() {
+async function route() {
+  if (!S) await loadSettings();
   const hash = location.hash || '#/';
   const path = hash.split('?')[0];
 
   if (path === '#/' || path === '#') {
     renderHome();
   } else if (path.startsWith('#/listing/')) {
-    const id = path.replace('#/listing/', '');
-    renderListing(id);
+    renderListing(path.replace('#/listing/', ''));
   } else if (path === '#/about') {
     renderAbout();
   } else if (path === '#/admin') {
@@ -904,7 +1037,6 @@ function route() {
   } else {
     renderHome();
   }
-
   window.scrollTo(0, 0);
 }
 
