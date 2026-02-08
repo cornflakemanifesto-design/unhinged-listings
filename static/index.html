@@ -380,6 +380,7 @@ async function loadSettings() {
       contactNoEmailMsg: 'Contact form coming soon. In the meantime, try yelling into the void.',
       sidebarPersonalsLabel: 'personals',
       sidebarDisclaimerLabel: 'disclaimer',
+      displayMode: 'list',
       contactText: 'Serious inquiries only. Cash preferred.',
       contactEmail: '',
     };
@@ -387,7 +388,6 @@ async function loadSettings() {
 }
 
 // ===== HELPERS =====
-let viewMode = 'list'; // 'list' or 'gallery'
 
 function esc(str) {
   if (!str) return '';
@@ -579,13 +579,8 @@ async function renderHome() {
           <strong>${esc(S.siteTitle).toUpperCase()}</strong> - ${esc(S.tagline)}<br>
           <span class="tagline">${esc(S.description)}</span>
         </div>
-        ${listings.length > 0 ? `<div class="view-toggle">
-          <strong>display:</strong>
-          <a href="#" id="viewList" class="${viewMode === 'list' ? 'active' : ''}">&#9776; list</a>
-          <a href="#" id="viewGallery" class="${viewMode === 'gallery' ? 'active' : ''}">&#9638; gallery</a>
-        </div>` : ''}
         <div id="listingsView">
-          ${viewMode === 'list' ? listHTML : galleryHTML}
+          ${S.displayMode === 'gallery' ? galleryHTML : listHTML}
           ${emptyHTML}
         </div>
       </div>
@@ -595,23 +590,6 @@ async function renderHome() {
   document.getElementById('catSelect').addEventListener('change', function() {
     location.hash = '#/?cat=' + this.value;
   });
-
-  if (listings.length > 0) {
-    document.getElementById('viewList').addEventListener('click', (e) => {
-      e.preventDefault();
-      viewMode = 'list';
-      document.getElementById('listingsView').innerHTML = listHTML;
-      document.getElementById('viewList').classList.add('active');
-      document.getElementById('viewGallery').classList.remove('active');
-    });
-    document.getElementById('viewGallery').addEventListener('click', (e) => {
-      e.preventDefault();
-      viewMode = 'gallery';
-      document.getElementById('listingsView').innerHTML = galleryHTML;
-      document.getElementById('viewGallery').classList.add('active');
-      document.getElementById('viewList').classList.remove('active');
-    });
-  }
 }
 
 // --- LISTING DETAIL ---
@@ -784,12 +762,12 @@ function renderAbout() {
       <h1>${esc(S.aboutTitle)}</h1>
 
       <div class="about-box">
-        <strong>What is this project?</strong><br><br>
+        <strong>What is Unhinged Listings?</strong><br><br>
         ${nl2br(S.aboutIntro)}
       </div>
 
       ${processItems ? `<div class="section">
-        <strong>The Process:</strong>
+        <strong>Process:</strong>
         <ul>${processItems}</ul>
       </div>` : ''}
 
@@ -799,16 +777,6 @@ function renderAbout() {
         <span style="font-size:11px;color:#666666">&mdash; ${esc(S.aboutQuoteSource)}</span>
       </div>` : ''}
 
-      ${S.aboutPhilosophy ? `<div class="about-box">
-        <strong>Philosophy:</strong><br><br>
-        ${nl2br(S.aboutPhilosophy)}
-      </div>` : ''}
-
-      ${S.aboutAuthenticity ? `<div class="section">
-        <strong>Authenticity:</strong><br>
-        ${nl2br(S.aboutAuthenticity)}
-      </div>` : ''}
-
       ${S.aboutWarning ? `<div class="about-warning">
         <strong>Warning:</strong> ${esc(S.aboutWarning)}
       </div>` : ''}
@@ -816,7 +784,7 @@ function renderAbout() {
       ${S.creatorBlurb || S.creatorImage ? `<div class="about-box" style="margin-top:20px;border-top:2px solid #ccc;padding-top:20px">
         <h2 style="font-size:15px;margin-bottom:12px;color:#800000">About the Creator</h2>
         <div style="display:flex;gap:15px;align-items:flex-start;flex-wrap:wrap">
-          ${S.creatorImage ? `<img src="${esc(S.creatorImage)}" alt="The Creator" style="width:140px;height:140px;object-fit:cover;border:1px solid #ccc" onerror="this.alt='[image failed to load]';this.style.padding='10px';this.style.fontSize='11px';this.style.color='#999';this.style.background='#f0f0f0';this.src=''">` : ''}
+          ${S.creatorImage ? `<img src="${esc(S.creatorImage)}" alt="The Creator" style="width:280px;height:280px;object-fit:cover;border:1px solid #ccc" onerror="this.alt='[image failed to load]';this.style.padding='10px';this.style.fontSize='11px';this.style.color='#999';this.style.background='#f0f0f0';this.src=''">` : ''}
           <div style="flex:1;min-width:200px">${nl2br(S.creatorBlurb)}</div>
         </div>
       </div>` : ''}
@@ -1184,6 +1152,13 @@ async function renderSettingsForm() {
         <label>Description (below tagline):</label>
         <input type="text" id="s_description" value="${esc(settings.description)}">
       </div>
+      <div class="form-group">
+        <label>Listing Display Mode:</label>
+        <select id="s_displayMode">
+          <option value="list" ${(settings.displayMode || 'list') === 'list' ? 'selected' : ''}>List</option>
+          <option value="gallery" ${(settings.displayMode || 'list') === 'gallery' ? 'selected' : ''}>Gallery</option>
+        </select>
+      </div>
     </fieldset>
 
     <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
@@ -1223,14 +1198,6 @@ async function renderSettingsForm() {
       <div class="form-group">
         <label>Quote Source:</label>
         <input type="text" id="s_aboutQuoteSource" value="${esc(settings.aboutQuoteSource)}">
-      </div>
-      <div class="form-group">
-        <label>Philosophy:</label>
-        <textarea id="s_aboutPhilosophy" style="min-height:80px">${esc(settings.aboutPhilosophy)}</textarea>
-      </div>
-      <div class="form-group">
-        <label>Authenticity:</label>
-        <textarea id="s_aboutAuthenticity" style="min-height:80px">${esc(settings.aboutAuthenticity)}</textarea>
       </div>
       <div class="form-group">
         <label>Warning:</label>
@@ -1348,6 +1315,7 @@ async function renderSettingsForm() {
       subtitle: document.getElementById('s_subtitle').value.trim(),
       tagline: document.getElementById('s_tagline').value.trim(),
       description: document.getElementById('s_description').value.trim(),
+      displayMode: document.getElementById('s_displayMode').value,
       categories: cats,
       safetyTips: document.getElementById('s_safetyTips').value.trim(),
       aboutTitle: document.getElementById('s_aboutTitle').value.trim(),
@@ -1355,8 +1323,6 @@ async function renderSettingsForm() {
       aboutProcess: document.getElementById('s_aboutProcess').value.trim(),
       aboutQuote: document.getElementById('s_aboutQuote').value.trim(),
       aboutQuoteSource: document.getElementById('s_aboutQuoteSource').value.trim(),
-      aboutPhilosophy: document.getElementById('s_aboutPhilosophy').value.trim(),
-      aboutAuthenticity: document.getElementById('s_aboutAuthenticity').value.trim(),
       aboutWarning: document.getElementById('s_aboutWarning').value.trim(),
       creatorBlurb: document.getElementById('s_creatorBlurb').value.trim(),
       creatorImage: document.getElementById('s_creatorImage').value.trim(),
