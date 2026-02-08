@@ -420,7 +420,6 @@ async function renderHome() {
           <span class="${statusClass(l.status)}" style="margin-left:10px;font-size:11px">(${l.status.toLowerCase()})</span>
         </div>
         <div class="listing-meta">${esc(l.location)} - ${formatDate(l.postedDate)}</div>
-        <div class="listing-excerpt">${esc(l.excerpt)}</div>
         <div class="listing-actions">
           <a href="#/listing/${l.id}">read full description</a> |
           <a href="${esc(l.facebookUrl)}" target="_blank" rel="noopener noreferrer"> view on facebook</a>
@@ -659,11 +658,18 @@ async function renderAdmin() {
       container.innerHTML = '<div style="color:#666;padding:10px">no listings yet. add one above.</div>';
       return;
     }
-    container.innerHTML = listings.map(l => `
-      <div class="admin-listing-row">
-        <div>
-          <strong>${esc(l.title)}</strong> — $${l.price}
-          <span class="${statusClass(l.status)}" style="font-size:11px;margin-left:5px">(${l.status})</span>
+    container.innerHTML = listings.map((l, idx) => `
+      <div class="admin-listing-row" data-id="${l.id}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <a href="#" class="move-btn move-up" data-idx="${idx}" style="font-size:10px;text-decoration:none;color:#666;${idx === 0 ? 'visibility:hidden' : ''}">&blacktriangle;</a>
+            <a href="#" class="move-btn move-down" data-idx="${idx}" style="font-size:10px;text-decoration:none;color:#666;${idx === listings.length - 1 ? 'visibility:hidden' : ''}">&blacktriangledown;</a>
+          </div>
+          <span style="color:#999;font-size:11px;min-width:20px">${idx + 1}.</span>
+          <div>
+            <strong>${esc(l.title)}</strong> — $${l.price}
+            <span class="${statusClass(l.status)}" style="font-size:11px;margin-left:5px">(${l.status})</span>
+          </div>
         </div>
         <div class="actions">
           <a href="#" class="edit-btn" data-id="${l.id}">edit</a>
@@ -671,6 +677,35 @@ async function renderAdmin() {
         </div>
       </div>
     `).join('');
+
+    // Reorder handlers
+    const allIds = listings.map(l => l.id);
+    container.querySelectorAll('.move-up').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const idx = parseInt(btn.dataset.idx);
+        if (idx > 0) {
+          [allIds[idx], allIds[idx - 1]] = [allIds[idx - 1], allIds[idx]];
+          try {
+            await apiPut('/admin/reorder', { order: allIds }, adminPassword);
+            renderAdmin();
+          } catch (err) { alert('Reorder failed: ' + err.message); }
+        }
+      });
+    });
+    container.querySelectorAll('.move-down').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const idx = parseInt(btn.dataset.idx);
+        if (idx < allIds.length - 1) {
+          [allIds[idx], allIds[idx + 1]] = [allIds[idx + 1], allIds[idx]];
+          try {
+            await apiPut('/admin/reorder', { order: allIds }, adminPassword);
+            renderAdmin();
+          } catch (err) { alert('Reorder failed: ' + err.message); }
+        }
+      });
+    });
 
     container.querySelectorAll('.edit-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {

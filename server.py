@@ -38,6 +38,7 @@ async def lifespan(app: FastAPI):
     logger.info("Connected to MongoDB")
     # Create indexes
     await db.listings.create_index("category")
+    await db.listings.create_index([("sortOrder", 1)])
     await db.listings.create_index([("postedDate", -1)])
     # Seed if empty
     count = await db.listings.count_documents({})
@@ -108,6 +109,7 @@ def listing_to_dict(listing) -> dict:
         "location": listing.get("location", "Colorado Springs, CO"),
         "postedDate": listing["postedDate"].isoformat() if isinstance(listing["postedDate"], datetime) else listing["postedDate"],
         "createdAt": listing.get("createdAt", listing["postedDate"]).isoformat() if isinstance(listing.get("createdAt", listing["postedDate"]), datetime) else str(listing.get("createdAt", "")),
+        "sortOrder": listing.get("sortOrder", 999),
     }
 
 
@@ -123,7 +125,7 @@ async def get_listings(category: Optional[str] = Query(None)):
     query = {}
     if category and category != "all":
         query["category"] = category
-    cursor = db.listings.find(query).sort("postedDate", -1)
+    cursor = db.listings.find(query).sort("sortOrder", 1)
     listings = await cursor.to_list(length=200)
     return [listing_to_dict(l) for l in listings]
 
@@ -223,6 +225,9 @@ async def create_listing(listing: ListingCreate, password: str = Query(...)):
         doc["postedDate"] = now
     doc["createdAt"] = now
     doc["updatedAt"] = now
+    # Set sortOrder to end of list
+    max_order = await db.listings.find_one(sort=[("sortOrder", -1)])
+    doc["sortOrder"] = (max_order.get("sortOrder", 0) + 1) if max_order else 0
     result = await db.listings.insert_one(doc)
     created = await db.listings.find_one({"_id": result.inserted_id})
     return listing_to_dict(created)
@@ -256,6 +261,20 @@ async def delete_listing(listing_id: str, password: str = Query(...)):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Listing not found")
     return {"ok": True, "deleted": listing_id}
+
+
+@app.put("/api/admin/reorder")
+async def reorder_listings(request: Request, password: str = Query(...)):
+    verify_admin(password)
+    data = await request.json()
+    order = data.get("order", [])  # list of listing IDs in desired order
+    for i, lid in enumerate(order):
+        if ObjectId.is_valid(lid):
+            await db.listings.update_one(
+                {"_id": ObjectId(lid)},
+                {"$set": {"sortOrder": i}}
+            )
+    return {"ok": True}
 
 
 # --- Seed Data ---
