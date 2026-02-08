@@ -69,7 +69,7 @@ class ListingCreate(BaseModel):
     price: float
     status: str = "In Stock"
     image: str = ""
-    excerpt: str
+    excerpt: str = ""
     fullText: str
     facebookUrl: str = ""
     category: str
@@ -91,6 +91,19 @@ class ListingUpdate(BaseModel):
 
 class AdminAuth(BaseModel):
     password: str
+
+
+class MissedConnectionCreate(BaseModel):
+    title: str
+    fullText: str
+    location: str = "Colorado Springs, CO"
+    postedDate: Optional[str] = None
+
+
+class MissedConnectionUpdate(BaseModel):
+    title: Optional[str] = None
+    fullText: Optional[str] = None
+    location: Optional[str] = None
 
 
 # --- Helpers ---
@@ -173,7 +186,10 @@ DEFAULT_SETTINGS = {
     "aboutPhilosophy": "What if classified ads were honest? What if they revealed not just the condition of our possessions, but the condition of our souls? Through intentional existential spirals and absurdist descriptions, these \"ads\" become literature that questions why we buy, why we sell, and why we pretend any of this makes sense.",
     "aboutAuthenticity": "All items are real and actually for sale. The Facebook Marketplace links lead to the live ads (when active). Some sell, some don't, but all serve as both functional commerce and performance art. The unhinged descriptions are posted exactly as written to actual buyers on Facebook Marketplace.",
     "aboutWarning": "Reading these listings may cause existential questioning about the nature of capitalism, the meaning of ownership, and why we accumulate objects only to eventually sell them to strangers on the internet.",
+    "creatorBlurb": "",
+    "creatorImage": "",
     "contactText": "Serious inquiries only. Cash preferred. Must be able to handle existential conversations about the nature of commerce.",
+    "contactEmail": "",
 }
 
 
@@ -272,6 +288,101 @@ async def reorder_listings(request: Request, password: str = Query(...)):
         if ObjectId.is_valid(lid):
             await db.listings.update_one(
                 {"_id": ObjectId(lid)},
+                {"$set": {"sortOrder": i}}
+            )
+    return {"ok": True}
+
+
+# --- Missed Connections Routes ---
+
+def mc_to_dict(mc) -> dict:
+    return {
+        "id": str(mc["_id"]),
+        "title": mc["title"],
+        "fullText": mc["fullText"],
+        "location": mc.get("location", "Colorado Springs, CO"),
+        "postedDate": mc["postedDate"].isoformat() if isinstance(mc["postedDate"], datetime) else mc["postedDate"],
+        "sortOrder": mc.get("sortOrder", 999),
+    }
+
+
+@app.get("/api/missed-connections")
+async def get_missed_connections():
+    cursor = db.missed_connections.find().sort("sortOrder", 1)
+    items = await cursor.to_list(length=200)
+    return [mc_to_dict(m) for m in items]
+
+
+@app.get("/api/missed-connections/{mc_id}")
+async def get_missed_connection(mc_id: str):
+    if not ObjectId.is_valid(mc_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    mc = await db.missed_connections.find_one({"_id": ObjectId(mc_id)})
+    if not mc:
+        raise HTTPException(status_code=404, detail="Not found")
+    return mc_to_dict(mc)
+
+
+@app.post("/api/admin/missed-connections")
+async def create_missed_connection(mc: MissedConnectionCreate, password: str = Query(...)):
+    verify_admin(password)
+    now = datetime.utcnow()
+    doc = mc.dict()
+    if doc.get("postedDate"):
+        try:
+            doc["postedDate"] = datetime.fromisoformat(doc["postedDate"])
+        except (ValueError, TypeError):
+            doc["postedDate"] = now
+    else:
+        doc["postedDate"] = now
+    doc["createdAt"] = now
+    doc["updatedAt"] = now
+    max_order = await db.missed_connections.find_one(sort=[("sortOrder", -1)])
+    doc["sortOrder"] = (max_order.get("sortOrder", 0) + 1) if max_order else 0
+    result = await db.missed_connections.insert_one(doc)
+    created = await db.missed_connections.find_one({"_id": result.inserted_id})
+    return mc_to_dict(created)
+
+
+@app.put("/api/admin/missed-connections/{mc_id}")
+async def update_missed_connection(mc_id: str, updates: MissedConnectionUpdate, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(mc_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    update_data = {k: v for k, v in updates.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update_data["updatedAt"] = datetime.utcnow()
+    result = await db.missed_connections.update_one(
+        {"_id": ObjectId(mc_id)},
+        {"$set": update_data}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    updated = await db.missed_connections.find_one({"_id": ObjectId(mc_id)})
+    return mc_to_dict(updated)
+
+
+@app.delete("/api/admin/missed-connections/{mc_id}")
+async def delete_missed_connection(mc_id: str, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(mc_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    result = await db.missed_connections.delete_one({"_id": ObjectId(mc_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True, "deleted": mc_id}
+
+
+@app.put("/api/admin/reorder-mc")
+async def reorder_missed_connections(request: Request, password: str = Query(...)):
+    verify_admin(password)
+    data = await request.json()
+    order = data.get("order", [])
+    for i, mid in enumerate(order):
+        if ObjectId.is_valid(mid):
+            await db.missed_connections.update_one(
+                {"_id": ObjectId(mid)},
                 {"$set": {"sortOrder": i}}
             )
     return {"ok": True}

@@ -236,6 +236,58 @@ textarea { resize: vertical; }
 
 .loading { padding: 20px; text-align: center; font-size: 13px; }
 
+/* Drag and drop */
+.drag-row { cursor: grab; user-select: none; }
+.drag-row:active { cursor: grabbing; }
+.drag-row.dragging { opacity: 0.4; background: #f0f0f0; }
+.drag-row.drag-over { border-top: 3px solid #0000EE; }
+.drag-handle { color: #999; margin-right: 6px; font-size: 14px; }
+
+/* Gallery view */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+}
+.gallery-card {
+  border: 1px solid #ccc;
+  padding: 8px;
+  background: #f8f8f8;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: background 0.15s;
+}
+.gallery-card:hover {
+  background: #eef;
+  border-color: #0000EE;
+}
+.gallery-card img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  margin-bottom: 8px;
+}
+.gallery-card .gallery-title {
+  font-size: 12px;
+  font-weight: bold;
+}
+.gallery-card .gallery-price {
+  font-size: 13px;
+  color: #006600;
+  margin: 4px 0;
+}
+.gallery-card .gallery-meta {
+  font-size: 11px;
+  color: #666;
+}
+
+/* View toggle */
+.view-toggle { font-size: 12px; margin-bottom: 10px; }
+.view-toggle a { margin-right: 10px; }
+.view-toggle a.active { color: #cc0000; font-weight: bold; }
+
 @media (max-width: 700px) {
   .main-layout { flex-direction: column; }
   .sidebar { width: 100%; }
@@ -315,12 +367,17 @@ async function loadSettings() {
       aboutPhilosophy: '',
       aboutAuthenticity: '',
       aboutWarning: '',
+      creatorBlurb: '',
+      creatorImage: '',
       contactText: 'Serious inquiries only. Cash preferred.',
+      contactEmail: '',
     };
   }
 }
 
 // ===== HELPERS =====
+let viewMode = 'list'; // 'list' or 'gallery'
+
 function esc(str) {
   if (!str) return '';
   const d = document.createElement('div');
@@ -350,6 +407,51 @@ function statusText(status) {
   return status ? status.toUpperCase() : '';
 }
 
+// ===== DRAG AND DROP =====
+function setupDragDrop(container, ids, endpoint, refreshFn) {
+  let dragIdx = null;
+  const rows = container.querySelectorAll('.drag-row');
+
+  rows.forEach(row => {
+    row.addEventListener('dragstart', (e) => {
+      dragIdx = parseInt(row.dataset.idx);
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      rows.forEach(r => r.classList.remove('drag-over'));
+    });
+
+    row.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      rows.forEach(r => r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+    });
+
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over');
+    });
+
+    row.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      rows.forEach(r => r.classList.remove('drag-over'));
+      const dropIdx = parseInt(row.dataset.idx);
+      if (dragIdx === null || dragIdx === dropIdx) return;
+
+      const item = ids.splice(dragIdx, 1)[0];
+      ids.splice(dropIdx, 0, item);
+
+      try {
+        await apiPut(endpoint, { order: ids }, adminPassword);
+        refreshFn();
+      } catch (err) { alert('Reorder failed: ' + err.message); }
+    });
+  });
+}
+
 // ===== TEMPLATES =====
 function headerHTML(subtitle) {
   return `
@@ -362,8 +464,10 @@ function headerHTML(subtitle) {
 function navHTML(extra) {
   return `
     <div class="craigslist-nav">
-      <a href="#/">home</a>
+      <a href="#/">for sale</a>
+      <a href="#/missed-connections">missed connections</a>
       <a href="#/about">about</a>
+      <a href="#/contact">contact</a>
       <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer">live marketplace</a>
       ${extra || ''}
       <span style="float:right;font-size:11px">search tips | posting guidelines</span>
@@ -411,7 +515,7 @@ async function renderHome() {
 
   const safetyHTML = (S.safetyTips || '').split('\n').map(t => `&bull; ${esc(t.trim())}`).join('<br>');
 
-  const listingsHTML = listings.length > 0 ? listings.map(l => `
+  const listHTML = listings.length > 0 ? listings.map(l => `
     <div class="listing-row">
       ${l.image ? `<img src="${esc(l.image)}" alt="${esc(l.title)}" class="listing-image" onerror="this.style.display='none'">` : ''}
       <div class="listing-info">
@@ -426,10 +530,21 @@ async function renderHome() {
         </div>
       </div>
     </div>
-  `).join('') : `
+  `).join('') : '';
+
+  const galleryHTML = listings.length > 0 ? `<div class="gallery-grid">${listings.map(l => `
+    <a href="#/listing/${l.id}" class="gallery-card">
+      ${l.image ? `<img src="${esc(l.image)}" alt="${esc(l.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22160%22><rect fill=%22%23eee%22 width=%22200%22 height=%22160%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22 font-size=%2214%22>no image</text></svg>'">` : `<div style="width:100%;height:160px;background:#eee;display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;margin-bottom:8px">no image</div>`}
+      <div class="gallery-price">$${l.price}</div>
+      <div class="gallery-title">${esc(l.title)}</div>
+      <div class="gallery-meta">${esc(l.location)}</div>
+    </a>
+  `).join('')}</div>` : '';
+
+  const emptyHTML = listings.length === 0 ? `
     <div style="padding:20px;text-align:center;color:#666666">
       no listings found in this category.<br>the void has consumed everything.
-    </div>`;
+    </div>` : '';
 
   app.innerHTML = headerHTML() + navHTML() + `
     <div class="category-filter">
@@ -453,7 +568,15 @@ async function renderHome() {
           <strong>${esc(S.siteTitle).toUpperCase()}</strong> - ${esc(S.tagline)}<br>
           <span class="tagline">${esc(S.description)}</span>
         </div>
-        ${listingsHTML}
+        ${listings.length > 0 ? `<div class="view-toggle">
+          <strong>display:</strong>
+          <a href="#" id="viewList" class="${viewMode === 'list' ? 'active' : ''}">&#9776; list</a>
+          <a href="#" id="viewGallery" class="${viewMode === 'gallery' ? 'active' : ''}">&#9638; gallery</a>
+        </div>` : ''}
+        <div id="listingsView">
+          ${viewMode === 'list' ? listHTML : galleryHTML}
+          ${emptyHTML}
+        </div>
       </div>
     </div>
   ` + footerHTML();
@@ -461,6 +584,23 @@ async function renderHome() {
   document.getElementById('catSelect').addEventListener('change', function() {
     location.hash = '#/?cat=' + this.value;
   });
+
+  if (listings.length > 0) {
+    document.getElementById('viewList').addEventListener('click', (e) => {
+      e.preventDefault();
+      viewMode = 'list';
+      document.getElementById('listingsView').innerHTML = listHTML;
+      document.getElementById('viewList').classList.add('active');
+      document.getElementById('viewGallery').classList.remove('active');
+    });
+    document.getElementById('viewGallery').addEventListener('click', (e) => {
+      e.preventDefault();
+      viewMode = 'gallery';
+      document.getElementById('listingsView').innerHTML = galleryHTML;
+      document.getElementById('viewGallery').classList.add('active');
+      document.getElementById('viewList').classList.remove('active');
+    });
+  }
 }
 
 // --- LISTING DETAIL ---
@@ -518,6 +658,105 @@ async function renderListing(id) {
   ` + footerHTML();
 }
 
+// --- MISSED CONNECTIONS LIST ---
+async function renderMissedConnections() {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML('colorado springs > community > missed connections') + navHTML() + `<div class="loading">loading missed connections...</div>` + footerHTML();
+
+  let items = [];
+  try {
+    items = await apiGet('/missed-connections');
+  } catch (e) {
+    app.innerHTML = headerHTML('colorado springs > community > missed connections') + navHTML() +
+      `<div style="padding:20px;text-align:center;color:#cc0000">failed to load missed connections. even longing has its limits.</div>` +
+      footerHTML();
+    return;
+  }
+
+  const listHTML = items.length > 0 ? items.map(m => `
+    <div class="listing-row">
+      <div class="listing-info">
+        <div class="listing-title">
+          <a href="#/missed-connections/${m.id}">${esc(m.title)}</a>
+        </div>
+        <div class="listing-meta">${esc(m.location)} - ${formatDate(m.postedDate)}</div>
+      </div>
+    </div>
+  `).join('') : `
+    <div style="padding:20px;text-align:center;color:#666666">
+      no missed connections yet.<br>the longing is still building.
+    </div>`;
+
+  app.innerHTML = headerHTML('colorado springs > community > missed connections') + navHTML() + `
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-box">
+          <strong>personals</strong>
+          <div class="sidebar-links">
+            <a href="#/missed-connections" class="active">missed connections</a>
+          </div>
+        </div>
+        <div class="sidebar-box">
+          <strong>disclaimer</strong>
+          <div class="safety-tips">
+            these missed connections are fictional absurdist pieces written in the style of craigslist personals. any resemblance to actual missed connections is purely coincidental and deeply unfortunate.
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="content-intro">
+          <strong>MISSED CONNECTIONS</strong> - fleeting encounters with strangers who will never read this<br>
+          <span class="tagline">where desperate longing meets the void of anonymous internet confessionals</span>
+        </div>
+        ${listHTML}
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
+// --- MISSED CONNECTION DETAIL ---
+async function renderMissedConnection(id) {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML('colorado springs > community > missed connections') + navHTML() + `<div class="loading">loading...</div>` + footerHTML();
+
+  let mc;
+  try {
+    mc = await apiGet('/missed-connections/' + id);
+  } catch (e) {
+    app.innerHTML = headerHTML('colorado springs > community > missed connections') + navHTML() + `
+      <div class="not-found">
+        <h2>missed connection not found</h2>
+        <p>this fleeting encounter has dissolved back into the void.</p>
+        <a href="#/missed-connections">&larr; return to missed connections</a>
+      </div>` + footerHTML();
+    return;
+  }
+
+  app.innerHTML = headerHTML('colorado springs > community > missed connections') + `
+    <div class="craigslist-nav">
+      <a href="#/missed-connections">&larr; back to missed connections</a>
+      <a href="#/">for sale</a>
+      <a href="#/about">about</a>
+      <span style="float:right;font-size:11px">search tips | posting guidelines</span>
+    </div>
+    <div class="listing-detail">
+      <div class="listing-detail-title">${esc(mc.title)}</div>
+      <div class="listing-detail-meta">
+        <table><tbody>
+          <tr><td><strong>location:</strong></td><td>${esc(mc.location)}</td></tr>
+          <tr><td><strong>posted:</strong></td><td>${formatDate(mc.postedDate)}</td></tr>
+        </tbody></table>
+      </div>
+      <div class="listing-detail-description" style="white-space:pre-wrap">${esc(mc.fullText)}</div>
+      <div class="page-nav">
+        <a href="#/missed-connections">&larr; back to missed connections</a> |
+        <a href="#/">for sale</a> |
+        <a href="#/about"> about this project</a>
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
 // --- ABOUT PAGE ---
 function renderAbout() {
   const processItems = (S.aboutProcess || '').split('\n').filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('');
@@ -563,12 +802,84 @@ function renderAbout() {
         <strong>Warning:</strong> ${esc(S.aboutWarning)}
       </div>` : ''}
 
+      ${S.creatorBlurb || S.creatorImage ? `<div class="about-box" style="margin-top:20px;border-top:2px solid #ccc;padding-top:20px">
+        <h2 style="font-size:15px;margin-bottom:12px;color:#800000">About the Creator</h2>
+        <div style="display:flex;gap:15px;align-items:flex-start;flex-wrap:wrap">
+          ${S.creatorImage ? `<img src="${esc(S.creatorImage)}" alt="The Creator" style="width:140px;height:140px;object-fit:cover;border:1px solid #ccc" onerror="this.style.display='none'">` : ''}
+          <div style="flex:1;min-width:200px">${nl2br(S.creatorBlurb)}</div>
+        </div>
+      </div>` : ''}
+
       <div class="page-nav">
         <a href="#/">&larr; back to listings</a> |
         <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer"> browse facebook marketplace</a>
       </div>
     </div>
   ` + footerHTML();
+}
+
+// --- CONTACT PAGE ---
+function renderContact() {
+  const app = document.getElementById('app');
+  const contactEmail = S.contactEmail || '';
+
+  app.innerHTML = headerHTML('colorado springs > contact') + navHTML() + `
+    <div class="about-content">
+      <h1>Contact</h1>
+      <div class="about-box">
+        <p>${nl2br(S.contactText || 'Got a question? Want to buy something? Just want to tell me I\'m weird? Go ahead.')}</p>
+      </div>
+      ${contactEmail ? `
+      <div class="about-box">
+        <strong>Send a message:</strong><br><br>
+        <div class="form-group">
+          <label>Your Name:</label>
+          <input type="text" id="contact_name" style="width:100%;max-width:400px">
+        </div>
+        <div class="form-group">
+          <label>Your Email:</label>
+          <input type="email" id="contact_email" style="width:100%;max-width:400px">
+        </div>
+        <div class="form-group">
+          <label>Subject:</label>
+          <input type="text" id="contact_subject" style="width:100%;max-width:400px">
+        </div>
+        <div class="form-group">
+          <label>Message:</label>
+          <textarea id="contact_message" style="width:100%;max-width:600px;min-height:150px"></textarea>
+        </div>
+        <button class="btn btn-primary" id="contactSendBtn">Send Message</button>
+        <div id="contactMsg" style="margin-top:10px"></div>
+      </div>
+      ` : `<div class="about-box"><em>Contact form coming soon. In the meantime, try yelling into the void.</em></div>`}
+      <div class="page-nav">
+        <a href="#/">&larr; back to listings</a> |
+        <a href="#/missed-connections">missed connections</a> |
+        <a href="#/about">about</a>
+      </div>
+    </div>
+  ` + footerHTML();
+
+  if (contactEmail) {
+    document.getElementById('contactSendBtn').addEventListener('click', () => {
+      const name = document.getElementById('contact_name').value.trim();
+      const email = document.getElementById('contact_email').value.trim();
+      const subject = document.getElementById('contact_subject').value.trim() || 'Message from Unhinged Listings';
+      const message = document.getElementById('contact_message').value.trim();
+
+      if (!message) {
+        document.getElementById('contactMsg').innerHTML = '<div class="msg-error">please write something. even the void expects effort.</div>';
+        return;
+      }
+
+      const body = (name ? 'From: ' + name + '\\n' : '') + (email ? 'Reply-to: ' + email + '\\n\\n' : '\\n') + message;
+      const mailtoLink = 'mailto:' + encodeURIComponent(contactEmail) +
+        '?subject=' + encodeURIComponent(subject) +
+        '&body=' + encodeURIComponent(body.replace(/\\n/g, '\n'));
+      window.location.href = mailtoLink;
+      document.getElementById('contactMsg').innerHTML = '<div class="msg-success">opening your email client... if nothing happens, email <a href="mailto:' + esc(contactEmail) + '">' + esc(contactEmail) + '</a> directly.</div>';
+    });
+  }
 }
 
 // --- ADMIN PAGE ---
@@ -613,6 +924,7 @@ async function renderAdmin() {
       <h1>admin panel <span style="font-size:12px;font-weight:normal">(<a href="#" id="logoutBtn">log out</a>)</span></h1>
       <div style="margin-bottom:20px;border-bottom:1px solid #ccc;padding-bottom:10px">
         <button class="btn" id="tabListings" style="font-weight:bold">Listings</button>
+        <button class="btn" id="tabMC" style="margin-left:10px">Missed Connections</button>
         <button class="btn" id="tabSettings" style="margin-left:10px">Site Settings</button>
       </div>
       <div id="adminListingsPanel">
@@ -622,25 +934,24 @@ async function renderAdmin() {
         <div id="adminListings"><div class="loading">loading...</div></div>
         <div id="adminForm" style="display:none"></div>
       </div>
+      <div id="adminMCPanel" style="display:none"></div>
       <div id="adminSettingsPanel" style="display:none"></div>
     </div>
   ` + footerHTML();
 
   // Tab switching
-  document.getElementById('tabListings').addEventListener('click', () => {
-    document.getElementById('adminListingsPanel').style.display = '';
-    document.getElementById('adminSettingsPanel').style.display = 'none';
-    document.getElementById('tabListings').style.fontWeight = 'bold';
-    document.getElementById('tabSettings').style.fontWeight = 'normal';
-  });
+  function showTab(tab) {
+    document.getElementById('adminListingsPanel').style.display = tab === 'listings' ? '' : 'none';
+    document.getElementById('adminMCPanel').style.display = tab === 'mc' ? '' : 'none';
+    document.getElementById('adminSettingsPanel').style.display = tab === 'settings' ? '' : 'none';
+    document.getElementById('tabListings').style.fontWeight = tab === 'listings' ? 'bold' : 'normal';
+    document.getElementById('tabMC').style.fontWeight = tab === 'mc' ? 'bold' : 'normal';
+    document.getElementById('tabSettings').style.fontWeight = tab === 'settings' ? 'bold' : 'normal';
+  }
 
-  document.getElementById('tabSettings').addEventListener('click', () => {
-    document.getElementById('adminListingsPanel').style.display = 'none';
-    document.getElementById('adminSettingsPanel').style.display = '';
-    document.getElementById('tabListings').style.fontWeight = 'normal';
-    document.getElementById('tabSettings').style.fontWeight = 'bold';
-    renderSettingsForm();
-  });
+  document.getElementById('tabListings').addEventListener('click', () => showTab('listings'));
+  document.getElementById('tabMC').addEventListener('click', () => { showTab('mc'); renderMCAdmin(); });
+  document.getElementById('tabSettings').addEventListener('click', () => { showTab('settings'); renderSettingsForm(); });
 
   document.getElementById('logoutBtn').addEventListener('click', (e) => {
     e.preventDefault();
@@ -659,12 +970,9 @@ async function renderAdmin() {
       return;
     }
     container.innerHTML = listings.map((l, idx) => `
-      <div class="admin-listing-row" data-id="${l.id}">
+      <div class="admin-listing-row drag-row" draggable="true" data-id="${l.id}" data-idx="${idx}">
         <div style="display:flex;align-items:center;gap:8px">
-          <div style="display:flex;flex-direction:column;gap:2px">
-            <a href="#" class="move-btn move-up" data-idx="${idx}" style="font-size:10px;text-decoration:none;color:#666;${idx === 0 ? 'visibility:hidden' : ''}">&blacktriangle;</a>
-            <a href="#" class="move-btn move-down" data-idx="${idx}" style="font-size:10px;text-decoration:none;color:#666;${idx === listings.length - 1 ? 'visibility:hidden' : ''}">&blacktriangledown;</a>
-          </div>
+          <span class="drag-handle">&#9776;</span>
           <span style="color:#999;font-size:11px;min-width:20px">${idx + 1}.</span>
           <div>
             <strong>${esc(l.title)}</strong> — $${l.price}
@@ -678,34 +986,8 @@ async function renderAdmin() {
       </div>
     `).join('');
 
-    // Reorder handlers
-    const allIds = listings.map(l => l.id);
-    container.querySelectorAll('.move-up').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const idx = parseInt(btn.dataset.idx);
-        if (idx > 0) {
-          [allIds[idx], allIds[idx - 1]] = [allIds[idx - 1], allIds[idx]];
-          try {
-            await apiPut('/admin/reorder', { order: allIds }, adminPassword);
-            renderAdmin();
-          } catch (err) { alert('Reorder failed: ' + err.message); }
-        }
-      });
-    });
-    container.querySelectorAll('.move-down').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const idx = parseInt(btn.dataset.idx);
-        if (idx < allIds.length - 1) {
-          [allIds[idx], allIds[idx + 1]] = [allIds[idx + 1], allIds[idx]];
-          try {
-            await apiPut('/admin/reorder', { order: allIds }, adminPassword);
-            renderAdmin();
-          } catch (err) { alert('Reorder failed: ' + err.message); }
-        }
-      });
-    });
+    // Drag and drop reorder
+    setupDragDrop(container, listings.map(l => l.id), '/admin/reorder', () => renderAdmin());
 
     container.querySelectorAll('.edit-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {
@@ -731,6 +1013,126 @@ async function renderAdmin() {
   } catch (e) {
     document.getElementById('adminListings').innerHTML = `<div class="msg-error">failed to load listings: ${esc(e.message)}</div>`;
   }
+}
+
+// --- MISSED CONNECTIONS ADMIN ---
+async function renderMCAdmin() {
+  const panel = document.getElementById('adminMCPanel');
+  panel.innerHTML = `
+    <div style="margin-bottom:15px">
+      <button class="btn btn-primary" id="newMCBtn">+ new missed connection</button>
+    </div>
+    <div id="mcList"><div class="loading">loading...</div></div>
+    <div id="mcForm" style="display:none"></div>
+  `;
+
+  document.getElementById('newMCBtn').addEventListener('click', () => showMCForm());
+
+  try {
+    const items = await apiGet('/missed-connections');
+    const container = document.getElementById('mcList');
+    if (items.length === 0) {
+      container.innerHTML = '<div style="color:#666;padding:10px">no missed connections yet. the longing awaits.</div>';
+      return;
+    }
+    container.innerHTML = items.map((m, idx) => `
+      <div class="admin-listing-row drag-row" draggable="true" data-id="${m.id}" data-idx="${idx}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="drag-handle">&#9776;</span>
+          <span style="color:#999;font-size:11px;min-width:20px">${idx + 1}.</span>
+          <strong>${esc(m.title)}</strong>
+        </div>
+        <div class="actions">
+          <a href="#" class="mc-edit-btn" data-id="${m.id}">edit</a>
+          <a href="#" class="mc-delete-btn btn-danger" data-id="${m.id}" data-title="${esc(m.title)}">delete</a>
+        </div>
+      </div>
+    `).join('');
+
+    // Drag and drop reorder
+    setupDragDrop(container, items.map(m => m.id), '/admin/reorder-mc', () => renderMCAdmin());
+
+    container.querySelectorAll('.mc-edit-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const mc = await apiGet('/missed-connections/' + btn.dataset.id);
+        showMCForm(mc);
+      });
+    });
+
+    container.querySelectorAll('.mc-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (confirm(`Delete "${btn.dataset.title}"? This cannot be undone.`)) {
+          try {
+            await apiDelete('/admin/missed-connections/' + btn.dataset.id, adminPassword);
+            renderMCAdmin();
+          } catch (err) { alert('Delete failed: ' + err.message); }
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById('mcList').innerHTML = `<div class="msg-error">failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+function showMCForm(existing) {
+  const isEdit = !!existing;
+  const form = document.getElementById('mcForm');
+  form.style.display = 'block';
+  document.getElementById('mcList').style.display = 'none';
+  document.getElementById('newMCBtn').style.display = 'none';
+
+  form.innerHTML = `
+    <h2 style="font-size:16px;margin-bottom:15px">${isEdit ? 'Edit' : 'New'} Missed Connection</h2>
+    <div class="form-group">
+      <label>Title:</label>
+      <input type="text" id="mc_title" value="${existing ? esc(existing.title) : ''}" placeholder="e.g. You were buying kombucha at King Soopers...">
+    </div>
+    <div class="form-group">
+      <label>Location:</label>
+      <input type="text" id="mc_location" value="${existing ? esc(existing.location) : 'Colorado Springs, CO'}">
+    </div>
+    <div class="form-group">
+      <label>Full Text:</label>
+      <textarea id="mc_fullText" placeholder="Pour your heart out here...">${existing ? esc(existing.fullText) : ''}</textarea>
+    </div>
+    <div style="margin-top:15px">
+      <button class="btn btn-primary" id="mcSaveBtn">${isEdit ? 'Save Changes' : 'Create'}</button>
+      <button class="btn" id="mcCancelBtn" style="margin-left:10px">Cancel</button>
+    </div>
+    <div id="mcFormMsg"></div>
+  `;
+
+  document.getElementById('mcCancelBtn').addEventListener('click', () => {
+    form.style.display = 'none';
+    document.getElementById('mcList').style.display = '';
+    document.getElementById('newMCBtn').style.display = '';
+  });
+
+  document.getElementById('mcSaveBtn').addEventListener('click', async () => {
+    const data = {
+      title: document.getElementById('mc_title').value.trim(),
+      location: document.getElementById('mc_location').value.trim(),
+      fullText: document.getElementById('mc_fullText').value.trim(),
+    };
+
+    if (!data.title || !data.fullText) {
+      document.getElementById('mcFormMsg').innerHTML = '<div class="msg-error">title and text are required. even longing has standards.</div>';
+      return;
+    }
+
+    try {
+      if (isEdit) {
+        await apiPut('/admin/missed-connections/' + existing.id, data, adminPassword);
+      } else {
+        await apiPost('/admin/missed-connections', data, adminPassword);
+      }
+      renderMCAdmin();
+    } catch (err) {
+      document.getElementById('mcFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+    }
+  });
 }
 
 // --- SETTINGS FORM ---
@@ -826,9 +1228,25 @@ async function renderSettingsForm() {
     </fieldset>
 
     <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
-      <legend style="font-weight:bold;font-size:13px">Listing Detail Page</legend>
+      <legend style="font-weight:bold;font-size:13px">About the Creator</legend>
       <div class="form-group">
-        <label>Contact Box Text:</label>
+        <label>Photo URL:</label>
+        <input type="text" id="s_creatorImage" value="${esc(settings.creatorImage || '')}" placeholder="https://... (right-click image > copy image address)">
+      </div>
+      <div class="form-group">
+        <label>Blurb:</label>
+        <textarea id="s_creatorBlurb" style="min-height:100px" placeholder="Tell the people who you are and why you do this...">${esc(settings.creatorBlurb || '')}</textarea>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Contact Page & Listing Detail</legend>
+      <div class="form-group">
+        <label>Your Email (enables contact form):</label>
+        <input type="email" id="s_contactEmail" value="${esc(settings.contactEmail || '')}" placeholder="you@example.com">
+      </div>
+      <div class="form-group">
+        <label>Contact Page / Listing Detail Text:</label>
         <textarea id="s_contactText" style="min-height:60px">${esc(settings.contactText)}</textarea>
       </div>
     </fieldset>
@@ -877,7 +1295,10 @@ async function renderSettingsForm() {
       aboutPhilosophy: document.getElementById('s_aboutPhilosophy').value.trim(),
       aboutAuthenticity: document.getElementById('s_aboutAuthenticity').value.trim(),
       aboutWarning: document.getElementById('s_aboutWarning').value.trim(),
+      creatorBlurb: document.getElementById('s_creatorBlurb').value.trim(),
+      creatorImage: document.getElementById('s_creatorImage').value.trim(),
       contactText: document.getElementById('s_contactText').value.trim(),
+      contactEmail: document.getElementById('s_contactEmail').value.trim(),
       footerText: document.getElementById('s_footerText').value.trim(),
       footerLinks: document.getElementById('s_footerLinks').value.trim(),
     };
@@ -893,33 +1314,17 @@ async function renderSettingsForm() {
   });
 }
 
-// Auto-extract fields from pasted ad text
+// Auto-extract price and location from pasted ad text
 function autoExtract(fullText) {
-  const lines = fullText.trim().split('\n').filter(l => l.trim());
-  let title = lines[0] || 'Untitled Listing';
-  title = title.replace(/^(condition|listed|home improvement|brand|for sale)[:\s-]*/i, '').trim();
-  if (title.length > 80) title = title.substring(0, 80) + '...';
-
   let price = 0;
   const priceMatch = fullText.match(/\$\s?(\d+(?:\.\d{2})?)/);
   if (priceMatch) price = parseFloat(priceMatch[1]);
-
-  let excerpt = '';
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (line.match(/^(condition|listed|brand|home improvement|for sale)[:\s]/i)) continue;
-    if (line.length < 15) continue;
-    excerpt = line;
-    if (excerpt.length > 200) excerpt = excerpt.substring(0, 200) + '...';
-    break;
-  }
-  if (!excerpt && lines.length > 0) excerpt = lines[0].substring(0, 200);
 
   let location = 'Colorado Springs, CO';
   const locMatch = fullText.match(/(?:in|from|near)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,?\s*[A-Z]{2})/);
   if (locMatch) location = locMatch[1].trim();
 
-  return { title, price, excerpt, location };
+  return { price, location };
 }
 
 function showListingForm(existing) {
@@ -941,14 +1346,17 @@ function showListingForm(existing) {
   if (!isEdit) {
     form.innerHTML = `
       <h2 style="font-size:16px;margin-bottom:15px">New Listing</h2>
-      <p style="font-size:12px;color:#666;margin-bottom:15px">Paste 3 things and you're done. Title, price, excerpt, and location are auto-extracted from your ad text.</p>
+      <div class="form-group">
+        <label>Title:</label>
+        <input type="text" id="f_title" placeholder="e.g. 8 Gal Stainless Steel Round Garbage Can">
+      </div>
       <div class="form-group">
         <label>Facebook Marketplace URL:</label>
         <input type="text" id="f_facebookUrl" placeholder="https://www.facebook.com/marketplace/item/...">
       </div>
       <div class="form-group">
         <label>Paste your full ad text:</label>
-        <textarea id="f_fullText" placeholder="Just copy-paste your entire Facebook Marketplace ad here."></textarea>
+        <textarea id="f_fullText" placeholder="Just copy-paste your entire Facebook Marketplace ad here. Price and location will be auto-extracted."></textarea>
       </div>
       <div class="form-group">
         <label>Category:</label>
@@ -958,29 +1366,12 @@ function showListingForm(existing) {
         <label>Image URL (optional):</label>
         <input type="text" id="f_image" placeholder="https://... (right-click image > copy image address)">
       </div>
-      <hr style="margin:20px 0;border:none;border-top:1px solid #ccc">
-      <div style="background:#f8f8f8;border:1px solid #ccc;padding:10px;margin-bottom:15px">
-        <strong style="font-size:12px">Preview (auto-extracted):</strong>
-        <div id="preview" style="font-size:12px;margin-top:8px;color:#666">start typing or paste your ad above...</div>
-      </div>
       <div style="margin-top:15px">
         <button class="btn btn-primary" id="saveBtn">Create Listing</button>
         <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
       </div>
       <div id="formMsg"></div>
     `;
-
-    document.getElementById('f_fullText').addEventListener('input', () => {
-      const text = document.getElementById('f_fullText').value;
-      if (!text.trim()) { document.getElementById('preview').innerHTML = 'start typing or paste your ad above...'; return; }
-      const ex = autoExtract(text);
-      document.getElementById('preview').innerHTML = `
-        <strong>Title:</strong> ${esc(ex.title)}<br>
-        <strong>Price:</strong> $${ex.price}<br>
-        <strong>Excerpt:</strong> ${esc(ex.excerpt)}<br>
-        <strong>Location:</strong> ${esc(ex.location)}
-      `;
-    });
 
     document.getElementById('cancelBtn').addEventListener('click', () => {
       form.style.display = 'none';
@@ -989,15 +1380,16 @@ function showListingForm(existing) {
     });
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
+      const title = document.getElementById('f_title').value.trim();
       const fullText = document.getElementById('f_fullText').value.trim();
-      if (!fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">paste your ad text.</div>'; return; }
+      if (!title || !fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and ad text are required.</div>'; return; }
       const ex = autoExtract(fullText);
       const data = {
-        title: ex.title, price: ex.price, category: document.getElementById('f_category').value,
+        title: title, price: ex.price, category: document.getElementById('f_category').value,
         status: 'In Stock', location: ex.location,
         image: document.getElementById('f_image').value.trim(),
         facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
-        excerpt: ex.excerpt, fullText: fullText,
+        fullText: fullText,
       };
       try {
         await apiPost('/admin/listings', data, adminPassword);
@@ -1017,7 +1409,6 @@ function showListingForm(existing) {
       <div class="form-group"><label>Location:</label><input type="text" id="f_location" value="${esc(existing.location)}"></div>
       <div class="form-group"><label>Image URL:</label><input type="text" id="f_image" value="${esc(existing.image)}"></div>
       <div class="form-group"><label>Facebook Marketplace URL:</label><input type="text" id="f_facebookUrl" value="${esc(existing.facebookUrl)}"></div>
-      <div class="form-group"><label>Excerpt:</label><textarea id="f_excerpt" style="min-height:80px">${esc(existing.excerpt)}</textarea></div>
       <div class="form-group"><label>Full Text:</label><textarea id="f_fullText">${esc(existing.fullText)}</textarea></div>
       <div style="margin-top:15px">
         <button class="btn btn-primary" id="saveBtn">Save Changes</button>
@@ -1041,7 +1432,6 @@ function showListingForm(existing) {
         location: document.getElementById('f_location').value.trim(),
         image: document.getElementById('f_image').value.trim(),
         facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
-        excerpt: document.getElementById('f_excerpt').value.trim(),
         fullText: document.getElementById('f_fullText').value.trim(),
       };
       if (!data.title || !data.fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and full text are required.</div>'; return; }
@@ -1065,6 +1455,12 @@ async function route() {
     renderHome();
   } else if (path.startsWith('#/listing/')) {
     renderListing(path.replace('#/listing/', ''));
+  } else if (path === '#/missed-connections') {
+    renderMissedConnections();
+  } else if (path.startsWith('#/missed-connections/')) {
+    renderMissedConnection(path.replace('#/missed-connections/', ''));
+  } else if (path === '#/contact') {
+    renderContact();
   } else if (path === '#/about') {
     renderAbout();
   } else if (path === '#/admin') {
