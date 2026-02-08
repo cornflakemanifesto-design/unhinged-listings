@@ -169,6 +169,8 @@ DEFAULT_SETTINGS = {
     "tagline": "where mundane commerce meets existential dread",
     "description": "real items for sale, written through the lens of late-stage capitalism and fourth-wall-breaking nihilism",
     "displayMode": "list",
+    "liveMarketplaceUrl": "#/darkweb",
+    "liveMarketplaceLabel": "live marketplace",
     "categories": [
         {"id": "all", "name": "All Listings"},
         {"id": "household", "name": "Household Items"},

@@ -381,6 +381,8 @@ async function loadSettings() {
       sidebarPersonalsLabel: 'personals',
       sidebarDisclaimerLabel: 'disclaimer',
       displayMode: 'list',
+      liveMarketplaceUrl: '#/darkweb',
+      liveMarketplaceLabel: 'live marketplace',
       contactText: 'Serious inquiries only. Cash preferred.',
       contactEmail: '',
     };
@@ -479,7 +481,7 @@ function navHTML(extra) {
       <a href="#/missed-connections">missed connections</a>
       <a href="#/about">about</a>
       <a href="#/contact">contact</a>
-      <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer">live marketplace</a>
+      <a href="${esc(S.liveMarketplaceUrl || '#/darkweb')}" ${(S.liveMarketplaceUrl && !S.liveMarketplaceUrl.startsWith('#')) ? 'target="_blank" rel="noopener noreferrer"' : ''}>${esc(S.liveMarketplaceLabel || 'live marketplace')}</a>
       ${extra || ''}
       <span style="float:right;font-size:11px">search tips | posting guidelines</span>
     </div>`;
@@ -640,8 +642,7 @@ async function renderListing(id) {
       </div>
       <div class="page-nav">
         <a href="#/">&larr; back to main listings</a> |
-        <a href="#/about"> about this project</a> |
-        <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer"> browse facebook marketplace</a>
+        <a href="#/about"> about this project</a>
       </div>
     </div>
   ` + footerHTML();
@@ -755,7 +756,7 @@ function renderAbout() {
     <div class="craigslist-nav">
       <a href="#/">&larr; back to listings</a>
       <a href="#/about">about</a>
-      <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer">live marketplace</a>
+      <a href="${esc(S.liveMarketplaceUrl || '#/darkweb')}" ${(S.liveMarketplaceUrl && !S.liveMarketplaceUrl.startsWith('#')) ? 'target="_blank" rel="noopener noreferrer"' : ''}>${esc(S.liveMarketplaceLabel || 'live marketplace')}</a>
       <span style="float:right;font-size:11px">search tips | posting guidelines</span>
     </div>
     <div class="about-content">
@@ -790,8 +791,7 @@ function renderAbout() {
       </div>` : ''}
 
       <div class="page-nav">
-        <a href="#/">&larr; back to listings</a> |
-        <a href="https://facebook.com/marketplace" target="_blank" rel="noopener noreferrer"> browse facebook marketplace</a>
+        <a href="#/">&larr; back to listings</a>
       </div>
     </div>
   ` + footerHTML();
@@ -859,6 +859,92 @@ function renderContact() {
       document.getElementById('contactMsg').innerHTML = '<div class="msg-success">opening your email client... if nothing happens, email <a href="mailto:' + esc(contactEmail) + '">' + esc(contactEmail) + '</a> directly.</div>';
     });
   }
+}
+
+// --- DARK WEB PAGE ---
+function renderDarkWeb() {
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div id="darkweb-screen" style="background:#0a0a0a;color:#00ff00;font-family:'Courier New',monospace;min-height:100vh;padding:0;margin:-10px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.15) 0px,rgba(0,0,0,0.15) 1px,transparent 1px,transparent 2px);pointer-events:none;z-index:1"></div>
+      <div style="position:relative;z-index:2;padding:40px 20px;max-width:700px;margin:0 auto">
+        <div style="text-align:center;margin-bottom:30px">
+          <div style="font-size:11px;color:#005500;margin-bottom:10px">TOR NETWORK ACTIVE &bull; NODE ENCRYPTION: AES-256 &bull; ROUTING: 14 RELAYS</div>
+          <pre style="color:#00ff00;font-size:10px;line-height:1.2;margin-bottom:20px">
+ ██████╗  █████╗ ██████╗ ██╗  ██╗    ██╗    ██╗███████╗██████╗
+ ██╔══██╗██╔══██╗██╔══██╗██║ ██╔╝    ██║    ██║██╔════╝██╔══██╗
+ ██║  ██║███████║██████╔╝█████╔╝     ██║ █╗ ██║█████╗  ██████╔╝
+ ██║  ██║██╔══██║██╔══██╗██╔═██╗     ██║███╗██║██╔══╝  ██╔══██╗
+ ██████╔╝██║  ██║██║  ██║██║  ██╗    ╚███╔███╔╝███████╗██████╔╝
+ ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝     ╚══╝╚══╝ ╚══════╝╚═════╝</pre>
+        </div>
+
+        <div id="dw-terminal" style="background:#050505;border:1px solid #003300;padding:15px;font-size:13px;line-height:1.8;min-height:300px">
+          <div style="color:#005500;margin-bottom:10px">root@onion-router:~$ access --deep-marketplace --encrypt</div>
+          <div id="dw-output"></div>
+        </div>
+
+        <div id="dw-warning" style="display:none;margin-top:20px;text-align:center">
+          <div style="color:#ff0000;font-size:18px;font-weight:bold;animation:blink 1s infinite">⚠ ACCESS DENIED ⚠</div>
+          <div style="color:#cc0000;margin-top:10px;font-size:13px" id="dw-denied-msg"></div>
+          <div style="margin-top:20px">
+            <a href="#/" style="color:#00ff00;font-size:14px;text-decoration:underline">[ RETURN TO SAFE ZONE ]</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>
+      @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    </style>
+  `;
+
+  const output = document.getElementById('dw-output');
+  const lines = [
+    { text: 'Initializing TOR relay chain...', delay: 400 },
+    { text: 'Connecting to entry node: 185.220.101.██ [ENCRYPTED]', delay: 600 },
+    { text: 'Routing through middle relay: 94.16.██.██ [GERMANY]', delay: 500 },
+    { text: 'Routing through middle relay: 51.15.██.██ [ROMANIA]', delay: 400 },
+    { text: 'Exit node established: 178.17.██.██ [MOLDOVA]', delay: 500 },
+    { text: 'Encryption layers: 3/3 ✓', delay: 300 },
+    { text: 'Requesting .onion address resolution...', delay: 700 },
+    { text: 'Marketplace descriptor found. Authenticating...', delay: 800 },
+    { text: '', delay: 200 },
+    { text: '> LOADING DEEP MARKETPLACE INVENTORY...', delay: 600, color: '#ffff00' },
+    { text: '> SCANNING FOR CONTRABAND LISTINGS...', delay: 500, color: '#ffff00' },
+    { text: '> VERIFYING VENDOR PGP SIGNATURES...', delay: 400, color: '#ffff00' },
+    { text: '', delay: 300 },
+    { text: '█████████████████████████ 100%', delay: 600, color: '#00ff00' },
+    { text: '', delay: 400 },
+    { text: 'CRITICAL ERROR: MARKETPLACE_ACCESS_VIOLATION', delay: 100, color: '#ff0000' },
+  ];
+
+  const deniedMessages = [
+    "Just kidding. This is a humor website about weird Facebook Marketplace ads.",
+    "You're not accessing the dark web. You're on a Craigslist parody site.",
+    "The only illegal thing here is some of these sellers' pricing.",
+    "Your IP has been logged. Just kidding. We don't even have a backend that sophisticated.",
+    "The deep web marketplace you're looking for is actually just a guy in Colorado Springs selling a used garbage can for $47.",
+    "ALERT: Your browsing history has been forwarded to... nobody. We literally don't care.",
+  ];
+
+  let i = 0;
+  function typeLine() {
+    if (i >= lines.length) {
+      setTimeout(() => {
+        document.getElementById('dw-warning').style.display = 'block';
+        document.getElementById('dw-denied-msg').textContent = deniedMessages[Math.floor(Math.random() * deniedMessages.length)];
+      }, 500);
+      return;
+    }
+    const line = lines[i];
+    const div = document.createElement('div');
+    div.style.color = line.color || '#00aa00';
+    div.textContent = line.text;
+    output.appendChild(div);
+    i++;
+    setTimeout(typeLine, line.delay);
+  }
+  setTimeout(typeLine, 500);
 }
 
 // --- ADMIN PAGE ---
@@ -1282,6 +1368,19 @@ async function renderSettingsForm() {
     </fieldset>
 
     <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Navigation Links</legend>
+      <div class="form-group">
+        <label>"Live Marketplace" Link Label:</label>
+        <input type="text" id="s_liveMarketplaceLabel" value="${esc(settings.liveMarketplaceLabel || 'live marketplace')}">
+      </div>
+      <div class="form-group">
+        <label>"Live Marketplace" Link URL:</label>
+        <input type="text" id="s_liveMarketplaceUrl" value="${esc(settings.liveMarketplaceUrl || '#/darkweb')}" placeholder="#/darkweb (default) or https://your-link.com">
+        <div style="font-size:11px;color:#666;margin-top:3px">Use #/darkweb for the built-in page, or paste any URL</div>
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
       <legend style="font-weight:bold;font-size:13px">Footer</legend>
       <div class="form-group">
         <label>Footer Text:</label>
@@ -1341,6 +1440,8 @@ async function renderSettingsForm() {
       contactEmail: document.getElementById('s_contactEmail').value.trim(),
       footerText: document.getElementById('s_footerText').value.trim(),
       footerLinks: document.getElementById('s_footerLinks').value.trim(),
+      liveMarketplaceUrl: document.getElementById('s_liveMarketplaceUrl').value.trim(),
+      liveMarketplaceLabel: document.getElementById('s_liveMarketplaceLabel').value.trim(),
     };
 
     try {
@@ -1491,6 +1592,8 @@ async function route() {
     renderMissedConnection(path.replace('#/missed-connections/', ''));
   } else if (path === '#/contact') {
     renderContact();
+  } else if (path === '#/darkweb') {
+    renderDarkWeb();
   } else if (path === '#/about') {
     renderAbout();
   } else if (path === '#/admin') {
