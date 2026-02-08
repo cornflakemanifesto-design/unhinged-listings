@@ -369,6 +369,17 @@ async function loadSettings() {
       aboutWarning: '',
       creatorBlurb: '',
       creatorImage: '',
+      mcTitle: 'MISSED CONNECTIONS',
+      mcTagline: 'fleeting encounters with strangers who will never read this',
+      mcDescription: 'where desperate longing meets the void of anonymous internet confessionals',
+      mcDisclaimer: 'these missed connections are fictional absurdist pieces written in the style of craigslist personals. any resemblance to actual missed connections is purely coincidental and deeply unfortunate.',
+      mcEmpty: 'no missed connections yet.\nthe longing is still building.',
+      emptyListingsMsg: 'no listings found in this category.\nthe void has consumed everything.',
+      listingNotFoundMsg: 'this item has vanished into the void of consumer capitalism.',
+      mcNotFoundMsg: 'this fleeting encounter has dissolved back into the void.',
+      contactNoEmailMsg: 'Contact form coming soon. In the meantime, try yelling into the void.',
+      sidebarPersonalsLabel: 'personals',
+      sidebarDisclaimerLabel: 'disclaimer',
       contactText: 'Serious inquiries only. Cash preferred.',
       contactEmail: '',
     };
@@ -543,7 +554,7 @@ async function renderHome() {
 
   const emptyHTML = listings.length === 0 ? `
     <div style="padding:20px;text-align:center;color:#666666">
-      no listings found in this category.<br>the void has consumed everything.
+      ${nl2br(S.emptyListingsMsg || 'no listings found in this category.')}
     </div>` : '';
 
   app.innerHTML = headerHTML() + navHTML() + `
@@ -615,7 +626,7 @@ async function renderListing(id) {
     app.innerHTML = headerHTML() + navHTML() + `
       <div class="not-found">
         <h2>listing not found</h2>
-        <p>this item has vanished into the void of consumer capitalism.</p>
+        <p>${esc(S.listingNotFoundMsg || 'this item has vanished into the void.')}</p>
         <a href="#/">&larr; return to main listings</a>
       </div>` + footerHTML();
     return;
@@ -684,29 +695,29 @@ async function renderMissedConnections() {
     </div>
   `).join('') : `
     <div style="padding:20px;text-align:center;color:#666666">
-      no missed connections yet.<br>the longing is still building.
+      ${nl2br(S.mcEmpty || 'no missed connections yet.')}
     </div>`;
 
   app.innerHTML = headerHTML('colorado springs > community > missed connections') + navHTML() + `
     <div class="main-layout">
       <div class="sidebar">
         <div class="sidebar-box">
-          <strong>personals</strong>
+          <strong>${esc(S.sidebarPersonalsLabel || 'personals')}</strong>
           <div class="sidebar-links">
             <a href="#/missed-connections" class="active">missed connections</a>
           </div>
         </div>
         <div class="sidebar-box">
-          <strong>disclaimer</strong>
+          <strong>${esc(S.sidebarDisclaimerLabel || 'disclaimer')}</strong>
           <div class="safety-tips">
-            these missed connections are fictional absurdist pieces written in the style of craigslist personals. any resemblance to actual missed connections is purely coincidental and deeply unfortunate.
+            ${nl2br(S.mcDisclaimer)}
           </div>
         </div>
       </div>
       <div class="content">
         <div class="content-intro">
-          <strong>MISSED CONNECTIONS</strong> - fleeting encounters with strangers who will never read this<br>
-          <span class="tagline">where desperate longing meets the void of anonymous internet confessionals</span>
+          <strong>${esc(S.mcTitle || 'MISSED CONNECTIONS')}</strong> - ${esc(S.mcTagline)}<br>
+          <span class="tagline">${esc(S.mcDescription)}</span>
         </div>
         ${listHTML}
       </div>
@@ -726,7 +737,7 @@ async function renderMissedConnection(id) {
     app.innerHTML = headerHTML('colorado springs > community > missed connections') + navHTML() + `
       <div class="not-found">
         <h2>missed connection not found</h2>
-        <p>this fleeting encounter has dissolved back into the void.</p>
+        <p>${esc(S.mcNotFoundMsg || 'this fleeting encounter has dissolved back into the void.')}</p>
         <a href="#/missed-connections">&larr; return to missed connections</a>
       </div>` + footerHTML();
     return;
@@ -851,7 +862,7 @@ function renderContact() {
         <button class="btn btn-primary" id="contactSendBtn">Send Message</button>
         <div id="contactMsg" style="margin-top:10px"></div>
       </div>
-      ` : `<div class="about-box"><em>Contact form coming soon. In the meantime, try yelling into the void.</em></div>`}
+      ` : `<div class="about-box"><em>${esc(S.contactNoEmailMsg || "Contact form coming soon.")}</em></div>`}
       <div class="page-nav">
         <a href="#/">&larr; back to listings</a> |
         <a href="#/missed-connections">missed connections</a> |
@@ -1240,6 +1251,58 @@ async function renderSettingsForm() {
     </fieldset>
 
     <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Missed Connections Page</legend>
+      <div class="form-group">
+        <label>Title:</label>
+        <input type="text" id="s_mcTitle" value="${esc(settings.mcTitle || 'MISSED CONNECTIONS')}">
+      </div>
+      <div class="form-group">
+        <label>Tagline (after title):</label>
+        <input type="text" id="s_mcTagline" value="${esc(settings.mcTagline || '')}">
+      </div>
+      <div class="form-group">
+        <label>Description (below tagline):</label>
+        <input type="text" id="s_mcDescription" value="${esc(settings.mcDescription || '')}">
+      </div>
+      <div class="form-group">
+        <label>Sidebar Disclaimer Text:</label>
+        <textarea id="s_mcDisclaimer" style="min-height:60px">${esc(settings.mcDisclaimer || '')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Sidebar "Personals" Label:</label>
+        <input type="text" id="s_sidebarPersonalsLabel" value="${esc(settings.sidebarPersonalsLabel || 'personals')}">
+      </div>
+      <div class="form-group">
+        <label>Sidebar "Disclaimer" Label:</label>
+        <input type="text" id="s_sidebarDisclaimerLabel" value="${esc(settings.sidebarDisclaimerLabel || 'disclaimer')}">
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
+      <legend style="font-weight:bold;font-size:13px">Empty / Not Found Messages</legend>
+      <div class="form-group">
+        <label>No Listings Found:</label>
+        <textarea id="s_emptyListingsMsg" style="min-height:50px">${esc(settings.emptyListingsMsg || 'no listings found in this category.')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>No Missed Connections Found:</label>
+        <textarea id="s_mcEmpty" style="min-height:50px">${esc(settings.mcEmpty || 'no missed connections yet.')}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Listing Not Found:</label>
+        <input type="text" id="s_listingNotFoundMsg" value="${esc(settings.listingNotFoundMsg || 'this item has vanished into the void.')}">
+      </div>
+      <div class="form-group">
+        <label>Missed Connection Not Found:</label>
+        <input type="text" id="s_mcNotFoundMsg" value="${esc(settings.mcNotFoundMsg || 'this fleeting encounter has dissolved back into the void.')}">
+      </div>
+      <div class="form-group">
+        <label>Contact Page (no email set):</label>
+        <input type="text" id="s_contactNoEmailMsg" value="${esc(settings.contactNoEmailMsg || 'Contact form coming soon.')}">
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid #ccc;padding:15px;margin-bottom:20px">
       <legend style="font-weight:bold;font-size:13px">Contact Page & Listing Detail</legend>
       <div class="form-group">
         <label>Your Email (enables contact form):</label>
@@ -1297,6 +1360,17 @@ async function renderSettingsForm() {
       aboutWarning: document.getElementById('s_aboutWarning').value.trim(),
       creatorBlurb: document.getElementById('s_creatorBlurb').value.trim(),
       creatorImage: document.getElementById('s_creatorImage').value.trim(),
+      mcTitle: document.getElementById('s_mcTitle').value.trim(),
+      mcTagline: document.getElementById('s_mcTagline').value.trim(),
+      mcDescription: document.getElementById('s_mcDescription').value.trim(),
+      mcDisclaimer: document.getElementById('s_mcDisclaimer').value.trim(),
+      mcEmpty: document.getElementById('s_mcEmpty').value.trim(),
+      sidebarPersonalsLabel: document.getElementById('s_sidebarPersonalsLabel').value.trim(),
+      sidebarDisclaimerLabel: document.getElementById('s_sidebarDisclaimerLabel').value.trim(),
+      emptyListingsMsg: document.getElementById('s_emptyListingsMsg').value.trim(),
+      listingNotFoundMsg: document.getElementById('s_listingNotFoundMsg').value.trim(),
+      mcNotFoundMsg: document.getElementById('s_mcNotFoundMsg').value.trim(),
+      contactNoEmailMsg: document.getElementById('s_contactNoEmailMsg').value.trim(),
       contactText: document.getElementById('s_contactText').value.trim(),
       contactEmail: document.getElementById('s_contactEmail').value.trim(),
       footerText: document.getElementById('s_footerText').value.trim(),
