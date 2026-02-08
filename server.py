@@ -168,6 +168,7 @@ DEFAULT_SETTINGS = {
     "subtitle": "colorado springs > for sale / wanted > general for sale",
     "tagline": "where mundane commerce meets existential dread",
     "description": "real items for sale, written through the lens of late-stage capitalism and fourth-wall-breaking nihilism",
+    "displayMode": "list",
     "categories": [
         {"id": "all", "name": "All Listings"},
         {"id": "household", "name": "Household Items"},
