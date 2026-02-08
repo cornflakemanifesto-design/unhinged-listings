@@ -816,7 +816,7 @@ function renderAbout() {
       ${S.creatorBlurb || S.creatorImage ? `<div class="about-box" style="margin-top:20px;border-top:2px solid #ccc;padding-top:20px">
         <h2 style="font-size:15px;margin-bottom:12px;color:#800000">About the Creator</h2>
         <div style="display:flex;gap:15px;align-items:flex-start;flex-wrap:wrap">
-          ${S.creatorImage ? `<img src="${esc(S.creatorImage)}" alt="The Creator" style="width:140px;height:140px;object-fit:cover;border:1px solid #ccc" onerror="this.style.display='none'">` : ''}
+          ${S.creatorImage ? `<img src="${esc(S.creatorImage)}" alt="The Creator" style="width:140px;height:140px;object-fit:cover;border:1px solid #ccc" onerror="this.alt='[image failed to load]';this.style.padding='10px';this.style.fontSize='11px';this.style.color='#999';this.style.background='#f0f0f0';this.src=''">` : ''}
           <div style="flex:1;min-width:200px">${nl2br(S.creatorBlurb)}</div>
         </div>
       </div>` : ''}
@@ -1420,26 +1420,14 @@ function showListingForm(existing) {
   if (!isEdit) {
     form.innerHTML = `
       <h2 style="font-size:16px;margin-bottom:15px">New Listing</h2>
-      <div class="form-group">
-        <label>Title:</label>
-        <input type="text" id="f_title" placeholder="e.g. 8 Gal Stainless Steel Round Garbage Can">
-      </div>
-      <div class="form-group">
-        <label>Facebook Marketplace URL:</label>
-        <input type="text" id="f_facebookUrl" placeholder="https://www.facebook.com/marketplace/item/...">
-      </div>
-      <div class="form-group">
-        <label>Paste your full ad text:</label>
-        <textarea id="f_fullText" placeholder="Just copy-paste your entire Facebook Marketplace ad here. Price and location will be auto-extracted."></textarea>
-      </div>
-      <div class="form-group">
-        <label>Category:</label>
-        <select id="f_category">${catOptions}</select>
-      </div>
-      <div class="form-group">
-        <label>Image URL (optional):</label>
-        <input type="text" id="f_image" placeholder="https://... (right-click image > copy image address)">
-      </div>
+      <div class="form-group"><label>Title:</label><input type="text" id="f_title" placeholder="e.g. 8 Gal Stainless Steel Round Garbage Can"></div>
+      <div class="form-group"><label>Price ($):</label><input type="number" id="f_price" step="0.01" value="0" placeholder="0.00"></div>
+      <div class="form-group"><label>Category:</label><select id="f_category">${catOptions}</select></div>
+      <div class="form-group"><label>Status:</label><select id="f_status">${statusOptions}</select></div>
+      <div class="form-group"><label>Location:</label><input type="text" id="f_location" value="Colorado Springs, CO"></div>
+      <div class="form-group"><label>Image URL:</label><input type="text" id="f_image" placeholder="https://... (right-click image > copy image address)"></div>
+      <div class="form-group"><label>Facebook Marketplace URL:</label><input type="text" id="f_facebookUrl" placeholder="https://www.facebook.com/marketplace/item/..."></div>
+      <div class="form-group"><label>Full Text:</label><textarea id="f_fullText" placeholder="Paste the full ad text here."></textarea></div>
       <div style="margin-top:15px">
         <button class="btn btn-primary" id="saveBtn">Create Listing</button>
         <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
@@ -1456,11 +1444,13 @@ function showListingForm(existing) {
     document.getElementById('saveBtn').addEventListener('click', async () => {
       const title = document.getElementById('f_title').value.trim();
       const fullText = document.getElementById('f_fullText').value.trim();
-      if (!title || !fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and ad text are required.</div>'; return; }
-      const ex = autoExtract(fullText);
+      if (!title || !fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and full text are required.</div>'; return; }
       const data = {
-        title: title, price: ex.price, category: document.getElementById('f_category').value,
-        status: 'In Stock', location: ex.location,
+        title: title,
+        price: parseFloat(document.getElementById('f_price').value) || 0,
+        category: document.getElementById('f_category').value,
+        status: document.getElementById('f_status').value,
+        location: document.getElementById('f_location').value.trim(),
         image: document.getElementById('f_image').value.trim(),
         facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
         fullText: fullText,
