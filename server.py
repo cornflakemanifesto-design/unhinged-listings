@@ -478,6 +478,29 @@ async def seed_initial_data():
 
 # --- Serve Frontend ---
 
+@app.get("/api/admin/export")
+async def export_all(password: str = Query(...)):
+    verify_admin(password)
+    listings = []
+    async for doc in db.listings.find().sort("sortOrder", 1):
+        doc["_id"] = str(doc["_id"])
+        listings.append(doc)
+    missed_connections = []
+    async for doc in db.missed_connections.find().sort("sortOrder", 1):
+        doc["_id"] = str(doc["_id"])
+        missed_connections.append(doc)
+    settings_doc = await db.settings.find_one({"_id": "site"})
+    if settings_doc:
+        settings_doc["_id"] = str(settings_doc["_id"])
+    from datetime import datetime
+    return {
+        "exported": datetime.utcnow().isoformat(),
+        "listings": listings,
+        "missed_connections": missed_connections,
+        "settings": settings_doc
+    }
+
+
 # Mount static files
 STATIC_DIR = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
