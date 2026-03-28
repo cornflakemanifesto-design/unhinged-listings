@@ -40,6 +40,9 @@ async def lifespan(app: FastAPI):
     await db.listings.create_index("category")
     await db.listings.create_index([("sortOrder", 1)])
     await db.listings.create_index([("postedDate", -1)])
+    await db.jobs.create_index("category")
+    await db.jobs.create_index([("sortOrder", 1)])
+    await db.jobs.create_index([("postedDate", -1)])
     # Seed if empty
     count = await db.listings.count_documents({})
     if count == 0:
@@ -104,6 +107,25 @@ class MissedConnectionUpdate(BaseModel):
     title: Optional[str] = None
     fullText: Optional[str] = None
     location: Optional[str] = None
+
+
+class JobCreate(BaseModel):
+    title: str
+    company: str
+    location: str = "Colorado Springs, CO"
+    salary: str = ""
+    fullText: str
+    category: str  # full-time, part-time, gig, internship, volunteer, unclear
+    postedDate: Optional[str] = None
+
+
+class JobUpdate(BaseModel):
+    title: Optional[str] = None
+    company: Optional[str] = None
+    location: Optional[str] = None
+    salary: Optional[str] = None
+    fullText: Optional[str] = None
+    category: Optional[str] = None
 
 
 # --- Helpers ---
@@ -402,6 +424,107 @@ async def reorder_missed_connections(request: Request, password: str = Query(...
     return {"ok": True}
 
 
+# --- Jobs Routes ---
+
+def job_to_dict(job) -> dict:
+    return {
+        "id": str(job["_id"]),
+        "title": job["title"],
+        "company": job["company"],
+        "location": job.get("location", "Colorado Springs, CO"),
+        "salary": job.get("salary", ""),
+        "fullText": job["fullText"],
+        "category": job["category"],
+        "postedDate": job["postedDate"].isoformat() if isinstance(job["postedDate"], datetime) else job["postedDate"],
+        "sortOrder": job.get("sortOrder", 999),
+    }
+
+
+@app.get("/api/jobs")
+async def get_jobs(category: Optional[str] = Query(None)):
+    query = {}
+    if category and category != "all":
+        query["category"] = category
+    cursor = db.jobs.find(query).sort("sortOrder", 1)
+    items = await cursor.to_list(length=200)
+    return [job_to_dict(j) for j in items]
+
+
+@app.get("/api/jobs/{job_id}")
+async def get_job(job_id: str):
+    if not ObjectId.is_valid(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    job = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job_to_dict(job)
+
+
+@app.post("/api/admin/jobs")
+async def create_job(job: JobCreate, password: str = Query(...)):
+    verify_admin(password)
+    now = datetime.utcnow()
+    doc = job.dict()
+    if doc.get("postedDate"):
+        try:
+            doc["postedDate"] = datetime.fromisoformat(doc["postedDate"])
+        except (ValueError, TypeError):
+            doc["postedDate"] = now
+    else:
+        doc["postedDate"] = now
+    doc["createdAt"] = now
+    doc["updatedAt"] = now
+    max_order = await db.jobs.find_one(sort=[("sortOrder", -1)])
+    doc["sortOrder"] = (max_order.get("sortOrder", 0) + 1) if max_order else 0
+    result = await db.jobs.insert_one(doc)
+    created = await db.jobs.find_one({"_id": result.inserted_id})
+    return job_to_dict(created)
+
+
+@app.put("/api/admin/jobs/{job_id}")
+async def update_job(job_id: str, updates: JobUpdate, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    update_data = {k: v for k, v in updates.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update_data["updatedAt"] = datetime.utcnow()
+    result = await db.jobs.update_one(
+        {"_id": ObjectId(job_id)},
+        {"$set": update_data}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Job not found")
+    updated = await db.jobs.find_one({"_id": ObjectId(job_id)})
+    return job_to_dict(updated)
+
+
+@app.delete("/api/admin/jobs/{job_id}")
+async def delete_job(job_id: str, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(job_id):
+        raise HTTPException(status_code=404, detail="Job not found")
+    result = await db.jobs.delete_one({"_id": ObjectId(job_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"ok": True, "deleted": job_id}
+
+
+@app.put("/api/admin/reorder-jobs")
+async def reorder_jobs(request: Request, password: str = Query(...)):
+    verify_admin(password)
+    data = await request.json()
+    order = data.get("order", [])
+    for i, jid in enumerate(order):
+        if ObjectId.is_valid(jid):
+            await db.jobs.update_one(
+                {"_id": ObjectId(jid)},
+                {"$set": {"sortOrder": i}}
+            )
+    return {"ok": True}
+
+
 # --- Seed Data ---
 
 async def seed_initial_data():
@@ -489,6 +612,10 @@ async def export_all(password: str = Query(...)):
     async for doc in db.missed_connections.find().sort("sortOrder", 1):
         doc["_id"] = str(doc["_id"])
         missed_connections.append(doc)
+    jobs = []
+    async for doc in db.jobs.find().sort("sortOrder", 1):
+        doc["_id"] = str(doc["_id"])
+        jobs.append(doc)
     settings_doc = await db.settings.find_one({"_id": "site"})
     if settings_doc:
         settings_doc["_id"] = str(settings_doc["_id"])
@@ -497,6 +624,7 @@ async def export_all(password: str = Query(...)):
         "exported": datetime.utcnow().isoformat(),
         "listings": listings,
         "missed_connections": missed_connections,
+        "jobs": jobs,
         "settings": settings_doc
     }
 

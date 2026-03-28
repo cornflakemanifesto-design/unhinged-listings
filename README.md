@@ -1,102 +1,108 @@
-# Unhinged Listings
+# Unhinged Listings — Project Instructions
 
-Where mundane commerce meets existential dread.
+## What this is
 
-A Craigslist-styled archive of real Facebook Marketplace listings written through the lens of late-stage capitalism and fourth-wall-breaking nihilism.
+A deployed Craigslist parody site at **unhingedlistings.com** where real Facebook Marketplace items are described through absurdist, stream-of-consciousness prose. The genre is "Quasi-Autofictional Absurdist Marketplace." It serves as both a live creative product and a freelance comedy writing portfolio.
 
-## Project Structure
+## Tech stack
+
+- **Backend:** Python / FastAPI (`server.py`)
+- **Frontend:** Single-page app (`static/index.html`) — plain HTML/CSS/JS, hash-based routing, Times New Roman, Craigslist aesthetic
+- **Database:** MongoDB Atlas
+- **Hosting:** Render (auto-deploy from GitHub on push)
+- **Repo:** github.com/cornflakemanifesto-design/unhinged-listings
+
+## Files you touch
+
+Only two files matter:
+
+- `server.py` — FastAPI backend, API routes, Pydantic models, admin auth, seed data
+- `static/index.html` — Complete frontend SPA (~1,634 lines) — all pages, styles, routing, admin panel
+
+Do not create additional files unless explicitly asked. Everything lives in these two files.
+
+## Architecture patterns
+
+Every content section follows the same pattern:
+
+1. **MongoDB collection** (e.g., `db.listings`, `db.missed_connections`)
+2. **Pydantic models** for create/update
+3. **FastAPI CRUD endpoints** (public GET, admin POST/PUT/DELETE with password query param)
+4. **Admin panel tab** in the frontend with drag-and-drop reorder
+5. **Frontend render function** with hash-based routing
+
+Admin auth: password passed as query parameter `?password=`, verified against `ADMIN_PASSWORD` env var.
+
+## Current site pages and routes
+
+| Route | Description |
+|-------|-------------|
+| `#/` | Home — listings with category filter, list/gallery toggle |
+| `#/listing/{id}` | Individual listing detail |
+| `#/missed-connections` | Fictional absurdist personals |
+| `#/missed-connections/{id}` | Individual missed connection |
+| `#/about` | Project philosophy |
+| `#/contact` | Contact / void-yelling placeholder |
+| `#/darkweb` | Prank page — green terminal aesthetic |
+| `#/admin` | Password-protected admin panel |
+
+## Current content
+
+- 30 listings across categories: household (20), tools (8), vintage (2)
+- 2 missed connections
+- No custom site settings in DB — runs on defaults in `server.py`
+
+## API structure
+
+Public endpoints:
+- `GET /api/listings` — optional `?category=` filter
+- `GET /api/listings/{id}`
+- `GET /api/missed-connections`
+- `GET /api/missed-connections/{id}`
+- `GET /api/settings`
+- `GET /api/categories`
+
+Admin endpoints (all require `?password=`):
+- `POST/PUT/DELETE /api/admin/listings/{id}`
+- `POST/PUT/DELETE /api/admin/missed-connections/{id}`
+- `PUT /api/admin/reorder` — accepts `{order: [id1, id2, ...]}`
+- `PUT /api/admin/reorder-mc`
+- `PUT /api/admin/settings`
+- `GET /api/admin/export`
+
+## Deploy process
 
 ```
-unhinged-listings/
-├── server.py          # FastAPI backend (API + serves frontend)
-├── static/
-│   └── index.html     # Complete frontend (single-page app)
-├── requirements.txt   # Python dependencies
-├── render.yaml        # Render deployment config
-├── .gitignore
-└── README.md
-```
-
-## Deploy to Render (Free Tier)
-
-### Step 1: Set Up MongoDB Atlas (Free)
-
-1. Go to [mongodb.com/atlas](https://www.mongodb.com/atlas) and create a free account
-2. Create a **free shared cluster** (M0 tier — 512MB, totally free)
-3. Under **Database Access**, create a database user with a username and password
-4. Under **Network Access**, click **Add IP Address** → **Allow Access From Anywhere** (0.0.0.0/0)
-5. On the cluster page, click **Connect** → **Connect your application** → **Copy the connection string**
-   - It will look like: `mongodb+srv://USERNAME:PASSWORD@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority`
-   - Replace `USERNAME` and `PASSWORD` with your actual credentials
-
-### Step 2: Push to GitHub
-
-1. Create a new repository on GitHub (e.g., `unhinged-listings`)
-2. Push this project:
-
-```bash
-cd unhinged-listings
-git init
 git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/unhinged-listings.git
-git push -u origin main
+git commit -m "describe what changed"
+git push
 ```
 
-### Step 3: Deploy on Render
+Render auto-deploys after push. Live in ~60 seconds.
 
-1. Go to [render.com](https://render.com) and sign up (free)
-2. Click **New** → **Web Service**
-3. Connect your GitHub repo
-4. Render should auto-detect settings from `render.yaml`, but verify:
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn server:app --host 0.0.0.0 --port $PORT`
-5. Under **Environment Variables**, add:
-   - `MONGO_URL` = your MongoDB Atlas connection string from Step 1
-   - `ADMIN_PASSWORD` = choose a password for the admin panel
-   - `DB_NAME` = `unhinged_listings`
-6. Click **Create Web Service**
+## Environment variables (on Render)
 
-Your site will be live at `https://unhinged-listings.onrender.com` (or similar) within a few minutes.
+- `MONGO_URL` — MongoDB Atlas connection string
+- `DB_NAME` — `unhinged_listings`
+- `ADMIN_PASSWORD` — admin panel password
 
-The database will be automatically seeded with your 5 existing listings on first launch.
+## Voice and tone
 
-## Using the Admin Panel
+The writing style is absurdist, stream-of-consciousness, fourth-wall-breaking. Product descriptions start normal and spiral into existential tangents. The humor comes from the contrast between mundane commerce and philosophical meltdown. Never mean-spirited, never punching down. The comedy is self-aware and self-deprecating.
 
-1. Go to `https://your-site.onrender.com/#/admin`
-2. Enter your admin password
-3. From here you can:
-   - **Add** new listings with the form
-   - **Edit** existing listings
-   - **Delete** listings
+## Important conventions
 
-## Running Locally
+- Craigslist visual aesthetic: Times New Roman, blue links, gray boxes, minimal styling
+- All frontend state managed via hash routing (`location.hash`)
+- Settings loaded once globally into `S` variable, used everywhere
+- HTML escaped via `esc()` helper function — always use it for user-facing text
+- Mobile responsive via `@media (max-width: 700px)` breakpoints
+- Admin panel supports drag-and-drop reorder for all content types
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+## What NOT to do
 
-# Set environment variables (or create a .env file)
-export MONGO_URL="mongodb://localhost:27017"
-export DB_NAME="unhinged_listings"
-export ADMIN_PASSWORD="changeme"
-
-# Run the server
-uvicorn server:app --reload --port 8000
-```
-
-Then open [http://localhost:8000](http://localhost:8000)
-
-## Adding New Listings
-
-Two ways:
-
-1. **Admin Panel** (easiest): Go to `/#/admin`, log in, click "+ new listing"
-2. **API**: POST to `/api/admin/listings?password=YOUR_PASSWORD` with listing JSON
-
-## Notes
-
-- Render's free tier spins down after 15 minutes of inactivity. First visit after idle may take ~30 seconds to load.
-- MongoDB Atlas free tier gives you 512MB — enough for thousands of listings.
-- Images are stored as URLs (hosted externally). You can use any image host or link to Facebook Marketplace images.
+- Don't add React, npm, or any build tools — this is vanilla JS
+- Don't create separate CSS or JS files — everything is inline in index.html
+- Don't change the deploy process or add Docker/containers
+- Don't modify the MongoDB connection logic or lifespan handler unless necessary
+- Don't break existing routes or endpoints — additive changes only

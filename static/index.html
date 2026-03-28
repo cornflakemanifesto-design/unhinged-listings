@@ -479,6 +479,7 @@ function navHTML(extra) {
     <div class="craigslist-nav">
       <a href="#/">for sale</a>
       <a href="#/missed-connections">missed connections</a>
+      <a href="#/jobs">jobs</a>
       <a href="#/about">about</a>
       <a href="#/contact">contact</a>
       <a href="${esc(S.liveMarketplaceUrl || '#/darkweb')}" ${(S.liveMarketplaceUrl && !S.liveMarketplaceUrl.startsWith('#')) ? 'target="_blank" rel="noopener noreferrer"' : ''}>${esc(S.liveMarketplaceLabel || 'live marketplace')}</a>
@@ -747,6 +748,124 @@ async function renderMissedConnection(id) {
   ` + footerHTML();
 }
 
+// --- JOBS LIST ---
+async function renderJobs() {
+  const app = document.getElementById('app');
+  const hash = location.hash;
+  const catMatch = hash.match(/[?&]cat=([^&]+)/);
+  let selectedCat = catMatch ? decodeURIComponent(catMatch[1]) : 'all';
+
+  app.innerHTML = headerHTML('colorado springs > jobs') + navHTML() + `<div class="loading">loading jobs...</div>` + footerHTML();
+
+  let items = [];
+  try {
+    const catParam = selectedCat !== 'all' ? `?category=${encodeURIComponent(selectedCat)}` : '';
+    items = await apiGet('/jobs' + catParam);
+  } catch (e) {
+    app.innerHTML = headerHTML('colorado springs > jobs') + navHTML() +
+      `<div style="padding:20px;text-align:center;color:#cc0000">failed to load jobs. the labor market has collapsed.</div>` +
+      footerHTML();
+    return;
+  }
+
+  const jobCats = [
+    {id: 'all', name: 'all jobs'},
+    {id: 'full-time', name: 'full-time'},
+    {id: 'part-time', name: 'part-time'},
+    {id: 'gig', name: 'gig'},
+    {id: 'internship', name: 'internship'},
+    {id: 'volunteer', name: 'volunteer'},
+    {id: 'unclear', name: 'unclear'},
+  ];
+
+  const sidebarLinks = jobCats.map(c =>
+    `<a href="#/jobs${c.id !== 'all' ? '?cat=' + c.id : ''}" class="${selectedCat === c.id ? 'active' : ''}">${c.name}</a>`
+  ).join('');
+
+  const listHTML = items.length > 0 ? items.map(j => `
+    <div class="listing-row">
+      <div class="listing-info">
+        <div class="listing-title">
+          <a href="#/jobs/${j.id}">${esc(j.title)}</a>
+        </div>
+        <div class="listing-meta">${esc(j.company)} &mdash; ${esc(j.location)} &mdash; ${formatDate(j.postedDate)}</div>
+        <div class="listing-meta" style="color:#006600">${esc(j.salary)}</div>
+        <div class="listing-meta" style="color:#666">${esc(j.category)}</div>
+        <div class="listing-actions">
+          <a href="#/jobs/${j.id}">read full description</a>
+        </div>
+      </div>
+    </div>
+  `).join('') : `
+    <div style="padding:20px;text-align:center;color:#666666">
+      no jobs found in this category.<br>the economy has nothing to offer you.
+    </div>`;
+
+  app.innerHTML = headerHTML('colorado springs > jobs') + navHTML() + `
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-box">
+          <strong>job categories</strong>
+          <div class="sidebar-links">${sidebarLinks}</div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="content-intro">
+          <strong>JOBS</strong> - colorado springs area employment<br>
+          <span class="tagline">(${items.length} posting${items.length !== 1 ? 's' : ''})</span>
+        </div>
+        ${listHTML}
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
+// --- JOB DETAIL ---
+async function renderJob(id) {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML('colorado springs > jobs') + navHTML() + `<div class="loading">loading job...</div>` + footerHTML();
+
+  let job;
+  try {
+    job = await apiGet('/jobs/' + id);
+  } catch (e) {
+    app.innerHTML = headerHTML('colorado springs > jobs') + navHTML() + `
+      <div class="not-found">
+        <h2>job not found</h2>
+        <p>this position has been eliminated. welcome to late-stage capitalism.</p>
+        <a href="#/jobs">&larr; return to jobs</a>
+      </div>` + footerHTML();
+    return;
+  }
+
+  app.innerHTML = headerHTML('colorado springs > jobs') + `
+    <div class="craigslist-nav">
+      <a href="#/jobs">&larr; back to jobs</a>
+      <a href="#/">for sale</a>
+      <a href="#/about">about</a>
+      <span style="float:right;font-size:11px">search tips | posting guidelines</span>
+    </div>
+    <div class="listing-detail">
+      <div class="listing-detail-title">${esc(job.title)}</div>
+      <div class="listing-detail-meta">
+        <table><tbody>
+          <tr><td><strong>company:</strong></td><td>${esc(job.company)}</td></tr>
+          <tr><td><strong>location:</strong></td><td>${esc(job.location)}</td></tr>
+          <tr><td><strong>salary:</strong></td><td style="color:#006600"><strong>${esc(job.salary)}</strong></td></tr>
+          <tr><td><strong>type:</strong></td><td>${esc(job.category)}</td></tr>
+          <tr><td><strong>posted:</strong></td><td>${formatDate(job.postedDate)}</td></tr>
+        </tbody></table>
+      </div>
+      <div class="listing-detail-description">${esc(job.fullText)}</div>
+      <div class="page-nav">
+        <a href="#/jobs">&larr; back to jobs</a> |
+        <a href="#/">for sale</a> |
+        <a href="#/about">about this project</a>
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
 // --- ABOUT PAGE ---
 function renderAbout() {
   const processItems = (S.aboutProcess || '').split('\n').filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('');
@@ -990,6 +1109,7 @@ async function renderAdmin() {
       <div style="margin-bottom:20px;border-bottom:1px solid #ccc;padding-bottom:10px">
         <button class="btn" id="tabListings" style="font-weight:bold">Listings</button>
         <button class="btn" id="tabMC" style="margin-left:10px">Missed Connections</button>
+        <button class="btn" id="tabJobs" style="margin-left:10px">Jobs</button>
         <button class="btn" id="tabSettings" style="margin-left:10px">Site Settings</button>
       </div>
       <div id="adminListingsPanel">
@@ -1000,6 +1120,7 @@ async function renderAdmin() {
         <div id="adminForm" style="display:none"></div>
       </div>
       <div id="adminMCPanel" style="display:none"></div>
+      <div id="adminJobsPanel" style="display:none"></div>
       <div id="adminSettingsPanel" style="display:none"></div>
     </div>
   ` + footerHTML();
@@ -1008,14 +1129,17 @@ async function renderAdmin() {
   function showTab(tab) {
     document.getElementById('adminListingsPanel').style.display = tab === 'listings' ? '' : 'none';
     document.getElementById('adminMCPanel').style.display = tab === 'mc' ? '' : 'none';
+    document.getElementById('adminJobsPanel').style.display = tab === 'jobs' ? '' : 'none';
     document.getElementById('adminSettingsPanel').style.display = tab === 'settings' ? '' : 'none';
     document.getElementById('tabListings').style.fontWeight = tab === 'listings' ? 'bold' : 'normal';
     document.getElementById('tabMC').style.fontWeight = tab === 'mc' ? 'bold' : 'normal';
+    document.getElementById('tabJobs').style.fontWeight = tab === 'jobs' ? 'bold' : 'normal';
     document.getElementById('tabSettings').style.fontWeight = tab === 'settings' ? 'bold' : 'normal';
   }
 
   document.getElementById('tabListings').addEventListener('click', () => showTab('listings'));
   document.getElementById('tabMC').addEventListener('click', () => { showTab('mc'); renderMCAdmin(); });
+  document.getElementById('tabJobs').addEventListener('click', () => { showTab('jobs'); renderJobsAdmin(); });
   document.getElementById('tabSettings').addEventListener('click', () => { showTab('settings'); renderSettingsForm(); });
 
   document.getElementById('logoutBtn').addEventListener('click', (e) => {
@@ -1214,6 +1338,147 @@ function showMCForm(existing) {
       renderMCAdmin();
     } catch (err) {
       document.getElementById('mcFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+    }
+  });
+}
+
+// --- JOBS ADMIN ---
+async function renderJobsAdmin() {
+  const panel = document.getElementById('adminJobsPanel');
+  panel.innerHTML = `
+    <div style="margin-bottom:15px">
+      <button class="btn btn-primary" id="newJobBtn">+ new job</button>
+    </div>
+    <div id="jobList"><div class="loading">loading...</div></div>
+    <div id="jobForm" style="display:none"></div>
+  `;
+
+  document.getElementById('newJobBtn').addEventListener('click', () => showJobForm());
+
+  try {
+    const items = await apiGet('/jobs');
+    const container = document.getElementById('jobList');
+    if (items.length === 0) {
+      container.innerHTML = '<div style="color:#666;padding:10px">no jobs yet. the economy is empty.</div>';
+      return;
+    }
+    container.innerHTML = items.map((j, idx) => `
+      <div class="admin-listing-row drag-row" draggable="true" data-id="${j.id}" data-idx="${idx}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="drag-handle">&#9776;</span>
+          <span style="color:#999;font-size:11px;min-width:20px">${idx + 1}.</span>
+          <div>
+            <strong>${esc(j.title)}</strong> &mdash; ${esc(j.company)}
+            <span style="font-size:11px;color:#666;margin-left:5px">(${esc(j.category)})</span>
+          </div>
+        </div>
+        <div class="actions">
+          <a href="#" class="job-edit-btn" data-id="${j.id}">edit</a>
+          <a href="#" class="job-delete-btn btn-danger" data-id="${j.id}" data-title="${esc(j.title)}">delete</a>
+        </div>
+      </div>
+    `).join('');
+
+    setupDragDrop(container, items.map(j => j.id), '/admin/reorder-jobs', () => renderJobsAdmin());
+
+    container.querySelectorAll('.job-edit-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const job = await apiGet('/jobs/' + btn.dataset.id);
+        showJobForm(job);
+      });
+    });
+
+    container.querySelectorAll('.job-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (confirm(`Delete "${btn.dataset.title}"? This cannot be undone.`)) {
+          try {
+            await apiDelete('/admin/jobs/' + btn.dataset.id, adminPassword);
+            renderJobsAdmin();
+          } catch (err) { alert('Delete failed: ' + err.message); }
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById('jobList').innerHTML = `<div class="msg-error">failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+function showJobForm(existing) {
+  const isEdit = !!existing;
+  const form = document.getElementById('jobForm');
+  form.style.display = 'block';
+  document.getElementById('jobList').style.display = 'none';
+  document.getElementById('newJobBtn').style.display = 'none';
+
+  const catOptions = ['full-time', 'part-time', 'gig', 'internship', 'volunteer', 'unclear'].map(c =>
+    `<option value="${c}" ${existing && existing.category === c ? 'selected' : ''}>${c}</option>`
+  ).join('');
+
+  form.innerHTML = `
+    <h2 style="font-size:16px;margin-bottom:15px">${isEdit ? 'Edit' : 'New'} Job</h2>
+    <div class="form-group">
+      <label>Title:</label>
+      <input type="text" id="j_title" value="${existing ? esc(existing.title) : ''}" placeholder="e.g. Senior Existential Crisis Coordinator">
+    </div>
+    <div class="form-group">
+      <label>Company:</label>
+      <input type="text" id="j_company" value="${existing ? esc(existing.company) : ''}" placeholder="e.g. Void Industries LLC">
+    </div>
+    <div class="form-group">
+      <label>Location:</label>
+      <input type="text" id="j_location" value="${existing ? esc(existing.location) : 'Colorado Springs, CO'}">
+    </div>
+    <div class="form-group">
+      <label>Salary:</label>
+      <input type="text" id="j_salary" value="${existing ? esc(existing.salary) : ''}" placeholder="e.g. $12/hr or one goat">
+    </div>
+    <div class="form-group">
+      <label>Category:</label>
+      <select id="j_category">${catOptions}</select>
+    </div>
+    <div class="form-group">
+      <label>Full Text:</label>
+      <textarea id="j_fullText" placeholder="Describe the position here...">${existing ? esc(existing.fullText) : ''}</textarea>
+    </div>
+    <div style="margin-top:15px">
+      <button class="btn btn-primary" id="jobSaveBtn">${isEdit ? 'Save Changes' : 'Create'}</button>
+      <button class="btn" id="jobCancelBtn" style="margin-left:10px">Cancel</button>
+    </div>
+    <div id="jobFormMsg"></div>
+  `;
+
+  document.getElementById('jobCancelBtn').addEventListener('click', () => {
+    form.style.display = 'none';
+    document.getElementById('jobList').style.display = '';
+    document.getElementById('newJobBtn').style.display = '';
+  });
+
+  document.getElementById('jobSaveBtn').addEventListener('click', async () => {
+    const data = {
+      title: document.getElementById('j_title').value.trim(),
+      company: document.getElementById('j_company').value.trim(),
+      location: document.getElementById('j_location').value.trim(),
+      salary: document.getElementById('j_salary').value.trim(),
+      category: document.getElementById('j_category').value,
+      fullText: document.getElementById('j_fullText').value.trim(),
+    };
+
+    if (!data.title || !data.company || !data.fullText) {
+      document.getElementById('jobFormMsg').innerHTML = '<div class="msg-error">title, company, and full text are required.</div>';
+      return;
+    }
+
+    try {
+      if (isEdit) {
+        await apiPut('/admin/jobs/' + existing.id, data, adminPassword);
+      } else {
+        await apiPost('/admin/jobs', data, adminPassword);
+      }
+      renderJobsAdmin();
+    } catch (err) {
+      document.getElementById('jobFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
     }
   });
 }
@@ -1608,6 +1873,10 @@ async function route() {
     renderMissedConnections();
   } else if (path.startsWith('#/missed-connections/')) {
     renderMissedConnection(path.replace('#/missed-connections/', ''));
+  } else if (path === '#/jobs') {
+    renderJobs();
+  } else if (path.startsWith('#/jobs/')) {
+    renderJob(path.replace('#/jobs/', ''));
   } else if (path === '#/contact') {
     renderContact();
   } else if (path === '#/darkweb') {
