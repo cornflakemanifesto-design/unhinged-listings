@@ -46,6 +46,8 @@ async def lifespan(app: FastAPI):
     await db.news.create_index("category")
     await db.news.create_index([("sortOrder", 1)])
     await db.news.create_index([("postedDate", -1)])
+    await db.horoscopes.create_index([("sign", 1), ("period", 1)], unique=True)
+    await db.horoscopes.create_index([("period", -1)])
     # Seed if empty
     count = await db.listings.count_documents({})
     if count == 0:
@@ -148,6 +150,25 @@ class NewsUpdate(BaseModel):
     category: Optional[str] = None
     author: Optional[str] = None
     location: Optional[str] = None
+
+
+ZODIAC_SIGNS = [
+    "aries", "taurus", "gemini", "cancer", "leo", "virgo",
+    "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"
+]
+
+
+class HoroscopeCreate(BaseModel):
+    sign: str       # one of ZODIAC_SIGNS
+    period: str     # e.g. "April 2026"
+    fullText: str
+    luckyItem: str = ""
+    postedDate: Optional[str] = None
+
+
+class HoroscopeUpdate(BaseModel):
+    fullText: Optional[str] = None
+    luckyItem: Optional[str] = None
 
 
 # --- Helpers ---
@@ -648,6 +669,110 @@ async def reorder_news(request: Request, password: str = Query(...)):
     return {"ok": True}
 
 
+# --- Horoscope Routes ---
+
+def horoscope_to_dict(item) -> dict:
+    return {
+        "id": str(item["_id"]),
+        "sign": item["sign"],
+        "period": item["period"],
+        "fullText": item["fullText"],
+        "luckyItem": item.get("luckyItem", ""),
+        "postedDate": item["postedDate"].isoformat() if isinstance(item["postedDate"], datetime) else item["postedDate"],
+    }
+
+
+@app.get("/api/horoscopes")
+async def get_horoscopes(period: Optional[str] = Query(None)):
+    query = {}
+    if period:
+        query["period"] = period
+    # Return in zodiac sign order
+    cursor = db.horoscopes.find(query)
+    items = await cursor.to_list(length=200)
+    sign_order = {s: i for i, s in enumerate(ZODIAC_SIGNS)}
+    items.sort(key=lambda x: sign_order.get(x.get("sign", ""), 99))
+    return [horoscope_to_dict(h) for h in items]
+
+
+@app.get("/api/horoscopes/periods")
+async def get_horoscope_periods():
+    periods = await db.horoscopes.distinct("period")
+    # Sort periods descending (most recent first) — relies on "Month YYYY" format
+    from datetime import datetime as dt
+    def parse_period(p):
+        try:
+            return dt.strptime(p, "%B %Y")
+        except Exception:
+            return dt.min
+    periods.sort(key=parse_period, reverse=True)
+    return periods
+
+
+@app.get("/api/horoscopes/{horoscope_id}")
+async def get_horoscope(horoscope_id: str):
+    if not ObjectId.is_valid(horoscope_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    item = await db.horoscopes.find_one({"_id": ObjectId(horoscope_id)})
+    if not item:
+        raise HTTPException(status_code=404, detail="Not found")
+    return horoscope_to_dict(item)
+
+
+@app.post("/api/admin/horoscopes")
+async def create_horoscope(item: HoroscopeCreate, password: str = Query(...)):
+    verify_admin(password)
+    if item.sign not in ZODIAC_SIGNS:
+        raise HTTPException(status_code=400, detail=f"Invalid sign. Must be one of: {', '.join(ZODIAC_SIGNS)}")
+    now = datetime.utcnow()
+    doc = item.dict()
+    if doc.get("postedDate"):
+        try:
+            doc["postedDate"] = datetime.fromisoformat(doc["postedDate"])
+        except (ValueError, TypeError):
+            doc["postedDate"] = now
+    else:
+        doc["postedDate"] = now
+    doc["createdAt"] = now
+    doc["updatedAt"] = now
+    try:
+        result = await db.horoscopes.insert_one(doc)
+    except Exception:
+        raise HTTPException(status_code=409, detail="A horoscope for this sign and period already exists")
+    created = await db.horoscopes.find_one({"_id": result.inserted_id})
+    return horoscope_to_dict(created)
+
+
+@app.put("/api/admin/horoscopes/{horoscope_id}")
+async def update_horoscope(horoscope_id: str, updates: HoroscopeUpdate, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(horoscope_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    update_data = {k: v for k, v in updates.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update_data["updatedAt"] = datetime.utcnow()
+    result = await db.horoscopes.update_one(
+        {"_id": ObjectId(horoscope_id)},
+        {"$set": update_data}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    updated = await db.horoscopes.find_one({"_id": ObjectId(horoscope_id)})
+    return horoscope_to_dict(updated)
+
+
+@app.delete("/api/admin/horoscopes/{horoscope_id}")
+async def delete_horoscope(horoscope_id: str, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(horoscope_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    result = await db.horoscopes.delete_one({"_id": ObjectId(horoscope_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True, "deleted": horoscope_id}
+
+
 # --- Seed Data ---
 
 async def seed_initial_data():
@@ -743,6 +868,10 @@ async def export_all(password: str = Query(...)):
     async for doc in db.news.find().sort("sortOrder", 1):
         doc["_id"] = str(doc["_id"])
         news.append(doc)
+    horoscopes = []
+    async for doc in db.horoscopes.find().sort([("period", -1), ("sign", 1)]):
+        doc["_id"] = str(doc["_id"])
+        horoscopes.append(doc)
     settings_doc = await db.settings.find_one({"_id": "site"})
     if settings_doc:
         settings_doc["_id"] = str(settings_doc["_id"])
@@ -753,6 +882,7 @@ async def export_all(password: str = Query(...)):
         "missed_connections": missed_connections,
         "jobs": jobs,
         "news": news,
+        "horoscopes": horoscopes,
         "settings": settings_doc
     }
 

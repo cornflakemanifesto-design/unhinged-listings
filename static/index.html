@@ -288,12 +288,47 @@ textarea { resize: vertical; }
 .view-toggle a { margin-right: 10px; }
 .view-toggle a.active { color: #cc0000; font-weight: bold; }
 
+/* Horoscopes */
+.horoscope-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 15px 0;
+}
+.horoscope-card {
+  border: 1px solid #cccccc;
+  padding: 12px;
+  cursor: pointer;
+  background: #f8f8f8;
+}
+.horoscope-card:hover { background: #efefef; }
+.horoscope-card.active { background: #fff8e1; border-color: #999; }
+.horoscope-card.empty { color: #999; font-style: italic; }
+.horoscope-sign { font-size: 22px; display: block; margin-bottom: 4px; }
+.horoscope-name { font-weight: bold; font-size: 12px; text-transform: uppercase; }
+.horoscope-dates { font-size: 10px; color: #666; }
+.horoscope-body {
+  display: none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #ccc;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.horoscope-body.open { display: block; }
+.horoscope-lucky { margin-top: 8px; font-size: 11px; color: #006600; font-style: italic; }
+.horoscope-period-bar { margin-bottom: 15px; font-size: 12px; }
+.horoscope-period-bar select { margin-left: 5px; }
+.horoscope-period-bar .no-periods { color: #999; font-style: italic; }
+
 @media (max-width: 700px) {
   .main-layout { flex-direction: column; }
   .sidebar { width: 100%; }
   .listing-detail-layout { flex-direction: column; }
   .listing-detail-image { max-width: 100%; }
   .listing-image { width: 80px; height: 60px; }
+  .horoscope-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>
 </head>
@@ -481,6 +516,7 @@ function navHTML(extra) {
       <a href="#/missed-connections">missed connections</a>
       <a href="#/jobs">jobs</a>
       <a href="#/news">community news</a>
+      <a href="#/horoscopes">horoscopes</a>
       <a href="#/about">about</a>
       <a href="#/contact">contact</a>
       <a href="${esc(S.liveMarketplaceUrl || '#/darkweb')}" ${(S.liveMarketplaceUrl && !S.liveMarketplaceUrl.startsWith('#')) ? 'target="_blank" rel="noopener noreferrer"' : ''}>${esc(S.liveMarketplaceLabel || 'live marketplace')}</a>
@@ -991,6 +1027,144 @@ async function renderNewsItem(id) {
   ` + footerHTML();
 }
 
+// --- HOROSCOPES PAGE ---
+const SIGNS = [
+  { id: 'aries',       symbol: '♈', name: 'Aries',       dates: 'Mar 21 – Apr 19' },
+  { id: 'taurus',      symbol: '♉', name: 'Taurus',      dates: 'Apr 20 – May 20' },
+  { id: 'gemini',      symbol: '♊', name: 'Gemini',      dates: 'May 21 – Jun 20' },
+  { id: 'cancer',      symbol: '♋', name: 'Cancer',      dates: 'Jun 21 – Jul 22' },
+  { id: 'leo',         symbol: '♌', name: 'Leo',         dates: 'Jul 23 – Aug 22' },
+  { id: 'virgo',       symbol: '♍', name: 'Virgo',       dates: 'Aug 23 – Sep 22' },
+  { id: 'libra',       symbol: '♎', name: 'Libra',       dates: 'Sep 23 – Oct 22' },
+  { id: 'scorpio',     symbol: '♏', name: 'Scorpio',     dates: 'Oct 23 – Nov 21' },
+  { id: 'sagittarius', symbol: '♐', name: 'Sagittarius', dates: 'Nov 22 – Dec 21' },
+  { id: 'capricorn',   symbol: '♑', name: 'Capricorn',   dates: 'Dec 22 – Jan 19' },
+  { id: 'aquarius',    symbol: '♒', name: 'Aquarius',    dates: 'Jan 20 – Feb 18' },
+  { id: 'pisces',      symbol: '♓', name: 'Pisces',      dates: 'Feb 19 – Mar 20' },
+];
+
+async function renderHoroscopes() {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML('colorado springs > horoscopes') + navHTML() + `<div class="loading">consulting the stars...</div>` + footerHTML();
+
+  let periods = [];
+  try {
+    periods = await apiGet('/horoscopes/periods');
+  } catch (e) { /* no periods yet — start fresh */ }
+
+  // Determine selected period
+  const hash = location.hash;
+  const periodMatch = hash.match(/[?&]period=([^&]+)/);
+  let selectedPeriod = periodMatch ? decodeURIComponent(periodMatch[1]) : (periods[0] || '');
+
+  let readings = [];
+  if (selectedPeriod) {
+    try {
+      readings = await apiGet('/horoscopes?period=' + encodeURIComponent(selectedPeriod));
+    } catch (e) { /* empty */ }
+  }
+
+  const readingMap = {};
+  for (const r of readings) readingMap[r.sign] = r;
+
+  const periodOptions = periods.map(p =>
+    `<option value="${esc(p)}" ${p === selectedPeriod ? 'selected' : ''}>${esc(p)}</option>`
+  ).join('');
+
+  const periodBar = periods.length > 0
+    ? `<div class="horoscope-period-bar">
+        <label><strong>period:</strong>
+          <select id="periodSelect">${periodOptions}</select>
+        </label>
+      </div>`
+    : `<div class="horoscope-period-bar"><span class="no-periods">no horoscopes published yet. the stars are still deciding.</span></div>`;
+
+  const cards = SIGNS.map(s => {
+    const r = readingMap[s.id];
+    const hasReading = !!r;
+    return `
+      <div class="horoscope-card${hasReading ? '' : ' empty'}" data-sign="${s.id}">
+        <span class="horoscope-sign">${s.symbol}</span>
+        <div class="horoscope-name">${esc(s.name)}</div>
+        <div class="horoscope-dates">${esc(s.dates)}</div>
+        ${hasReading ? `
+          <div class="horoscope-body" id="hbody-${s.id}">
+            ${esc(r.fullText)}
+            ${r.luckyItem ? `<div class="horoscope-lucky">★ lucky item: ${esc(r.luckyItem)}</div>` : ''}
+          </div>` : `<div class="horoscope-body" id="hbody-${s.id}"></div>`}
+      </div>`;
+  }).join('');
+
+  app.innerHTML = headerHTML('colorado springs > horoscopes') + navHTML() + `
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-box">
+          <strong>signs</strong>
+          <div class="sidebar-links">
+            ${SIGNS.map(s => `<a href="#" class="sign-jump" data-sign="${s.id}">${s.symbol} ${s.name}</a>`).join('')}
+          </div>
+        </div>
+        <div class="sidebar-box">
+          <div class="safety-tips" style="font-style:italic;color:#666">
+            the stars are not responsible<br>for your purchasing decisions.<br>your purchasing decisions<br>are responsible for your<br>purchasing decisions.
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="content-intro">
+          <strong>HOROSCOPES</strong> - cosmic guidance for confused consumers<br>
+          <span class="tagline">(click a sign to reveal your fate | accuracy not guaranteed | void where prohibited)</span>
+        </div>
+        ${periodBar}
+        <div class="horoscope-grid">${cards}</div>
+      </div>
+    </div>
+  ` + footerHTML();
+
+  // Period change
+  const sel = document.getElementById('periodSelect');
+  if (sel) {
+    sel.addEventListener('change', () => {
+      location.hash = '#/horoscopes?period=' + encodeURIComponent(sel.value);
+    });
+  }
+
+  // Click to expand/collapse
+  document.querySelectorAll('.horoscope-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const sign = card.dataset.sign;
+      const body = document.getElementById('hbody-' + sign);
+      if (!body || !body.textContent.trim()) return;
+      const isOpen = body.classList.contains('open');
+      // Close all
+      document.querySelectorAll('.horoscope-body').forEach(b => b.classList.remove('open'));
+      document.querySelectorAll('.horoscope-card').forEach(c => c.classList.remove('active'));
+      if (!isOpen) {
+        body.classList.add('open');
+        card.classList.add('active');
+      }
+    });
+  });
+
+  // Sidebar jump links
+  document.querySelectorAll('.sign-jump').forEach(a => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const sign = a.dataset.sign;
+      const card = document.querySelector(`.horoscope-card[data-sign="${sign}"]`);
+      if (!card) return;
+      const body = document.getElementById('hbody-' + sign);
+      if (body && body.textContent.trim()) {
+        document.querySelectorAll('.horoscope-body').forEach(b => b.classList.remove('open'));
+        document.querySelectorAll('.horoscope-card').forEach(c => c.classList.remove('active'));
+        body.classList.add('open');
+        card.classList.add('active');
+      }
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  });
+}
+
 // --- ABOUT PAGE ---
 function renderAbout() {
   const processItems = (S.aboutProcess || '').split('\n').filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('');
@@ -1236,6 +1410,7 @@ async function renderAdmin() {
         <button class="btn" id="tabMC" style="margin-left:10px">Missed Connections</button>
         <button class="btn" id="tabJobs" style="margin-left:10px">Jobs</button>
         <button class="btn" id="tabNews" style="margin-left:10px">News</button>
+        <button class="btn" id="tabHoroscopes" style="margin-left:10px">Horoscopes</button>
         <button class="btn" id="tabSettings" style="margin-left:10px">Site Settings</button>
       </div>
       <div id="adminListingsPanel">
@@ -1248,6 +1423,7 @@ async function renderAdmin() {
       <div id="adminMCPanel" style="display:none"></div>
       <div id="adminJobsPanel" style="display:none"></div>
       <div id="adminNewsPanel" style="display:none"></div>
+      <div id="adminHoroscopesPanel" style="display:none"></div>
       <div id="adminSettingsPanel" style="display:none"></div>
     </div>
   ` + footerHTML();
@@ -1258,11 +1434,13 @@ async function renderAdmin() {
     document.getElementById('adminMCPanel').style.display = tab === 'mc' ? '' : 'none';
     document.getElementById('adminJobsPanel').style.display = tab === 'jobs' ? '' : 'none';
     document.getElementById('adminNewsPanel').style.display = tab === 'news' ? '' : 'none';
+    document.getElementById('adminHoroscopesPanel').style.display = tab === 'horoscopes' ? '' : 'none';
     document.getElementById('adminSettingsPanel').style.display = tab === 'settings' ? '' : 'none';
     document.getElementById('tabListings').style.fontWeight = tab === 'listings' ? 'bold' : 'normal';
     document.getElementById('tabMC').style.fontWeight = tab === 'mc' ? 'bold' : 'normal';
     document.getElementById('tabJobs').style.fontWeight = tab === 'jobs' ? 'bold' : 'normal';
     document.getElementById('tabNews').style.fontWeight = tab === 'news' ? 'bold' : 'normal';
+    document.getElementById('tabHoroscopes').style.fontWeight = tab === 'horoscopes' ? 'bold' : 'normal';
     document.getElementById('tabSettings').style.fontWeight = tab === 'settings' ? 'bold' : 'normal';
   }
 
@@ -1270,6 +1448,7 @@ async function renderAdmin() {
   document.getElementById('tabMC').addEventListener('click', () => { showTab('mc'); renderMCAdmin(); });
   document.getElementById('tabJobs').addEventListener('click', () => { showTab('jobs'); renderJobsAdmin(); });
   document.getElementById('tabNews').addEventListener('click', () => { showTab('news'); renderNewsAdmin(); });
+  document.getElementById('tabHoroscopes').addEventListener('click', () => { showTab('horoscopes'); renderHoroscopesAdmin(); });
   document.getElementById('tabSettings').addEventListener('click', () => { showTab('settings'); renderSettingsForm(); });
 
   document.getElementById('logoutBtn').addEventListener('click', (e) => {
@@ -1754,6 +1933,172 @@ function showNewsForm(existing) {
   });
 }
 
+// --- HOROSCOPES ADMIN ---
+const ADMIN_SIGNS = [
+  { id: 'aries', symbol: '♈', name: 'Aries' },
+  { id: 'taurus', symbol: '♉', name: 'Taurus' },
+  { id: 'gemini', symbol: '♊', name: 'Gemini' },
+  { id: 'cancer', symbol: '♋', name: 'Cancer' },
+  { id: 'leo', symbol: '♌', name: 'Leo' },
+  { id: 'virgo', symbol: '♍', name: 'Virgo' },
+  { id: 'libra', symbol: '♎', name: 'Libra' },
+  { id: 'scorpio', symbol: '♏', name: 'Scorpio' },
+  { id: 'sagittarius', symbol: '♐', name: 'Sagittarius' },
+  { id: 'capricorn', symbol: '♑', name: 'Capricorn' },
+  { id: 'aquarius', symbol: '♒', name: 'Aquarius' },
+  { id: 'pisces', symbol: '♓', name: 'Pisces' },
+];
+
+async function renderHoroscopesAdmin() {
+  const panel = document.getElementById('adminHoroscopesPanel');
+  panel.innerHTML = `<div class="loading">loading...</div>`;
+
+  let periods = [];
+  try { periods = await apiGet('/horoscopes/periods'); } catch (e) {}
+
+  // Default to current month/year
+  const now = new Date();
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const currentPeriod = monthNames[now.getMonth()] + ' ' + now.getFullYear();
+  if (!periods.includes(currentPeriod)) periods = [currentPeriod, ...periods];
+
+  let selectedPeriod = periods[0] || currentPeriod;
+
+  function renderPanel(period) {
+    panel.innerHTML = `
+      <div style="margin-bottom:15px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <label><strong>Period:</strong>
+          <select id="adminPeriodSelect" style="margin-left:5px">
+            ${periods.map(p => `<option value="${esc(p)}" ${p === period ? 'selected' : ''}>${esc(p)}</option>`).join('')}
+          </select>
+        </label>
+        <input type="text" id="newPeriodInput" placeholder="or type new period (e.g. May 2026)" style="width:200px">
+        <button class="btn" id="usePeriodBtn">use this period</button>
+      </div>
+      <div id="horoscopeSignGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px">
+        <div class="loading">loading signs...</div>
+      </div>
+      <div id="horoscopeFormArea" style="display:none"></div>
+    `;
+
+    document.getElementById('usePeriodBtn').addEventListener('click', () => {
+      const val = document.getElementById('newPeriodInput').value.trim();
+      if (val) {
+        if (!periods.includes(val)) periods = [val, ...periods];
+        renderPanel(val);
+      }
+    });
+
+    document.getElementById('adminPeriodSelect').addEventListener('change', (e) => {
+      renderPanel(e.target.value);
+    });
+
+    loadSignGrid(period);
+  }
+
+  async function loadSignGrid(period) {
+    const grid = document.getElementById('horoscopeSignGrid');
+    let readings = [];
+    try { readings = await apiGet('/horoscopes?period=' + encodeURIComponent(period)); } catch (e) {}
+    const readingMap = {};
+    for (const r of readings) readingMap[r.sign] = r;
+
+    grid.innerHTML = ADMIN_SIGNS.map(s => {
+      const r = readingMap[s.id];
+      return `
+        <div class="horoscope-card" data-sign="${s.id}" style="cursor:pointer" title="${r ? 'click to edit' : 'click to add'}">
+          <span class="horoscope-sign">${s.symbol}</span>
+          <div class="horoscope-name">${esc(s.name)}</div>
+          <div class="horoscope-dates" style="${r ? 'color:#006600' : 'color:#cc6600'}">
+            ${r ? '✓ written' : '— empty'}
+          </div>
+          ${r ? `<div style="font-size:10px;color:#666;margin-top:4px;overflow:hidden;max-height:30px">${esc(r.fullText.substring(0,60))}…</div>` : ''}
+        </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.horoscope-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const sign = card.dataset.sign;
+        const existing = readingMap[sign] || null;
+        showHoroscopeForm(period, sign, existing, () => loadSignGrid(period));
+      });
+    });
+  }
+
+  renderPanel(selectedPeriod);
+}
+
+function showHoroscopeForm(period, sign, existing, onSave) {
+  const formArea = document.getElementById('horoscopeFormArea');
+  const grid = document.getElementById('horoscopeSignGrid');
+  const signMeta = ADMIN_SIGNS.find(s => s.id === sign);
+  formArea.style.display = 'block';
+  grid.style.display = 'none';
+
+  formArea.innerHTML = `
+    <h2 style="font-size:16px;margin-bottom:15px">
+      ${signMeta.symbol} ${esc(signMeta.name)} &mdash; ${esc(period)}
+      ${existing ? '' : '<span style="color:#cc6600;font-size:12px">(new)</span>'}
+    </h2>
+    <div class="form-group">
+      <label>Full Reading:</label>
+      <textarea id="h_fullText" rows="8" placeholder="Write the horoscope here...">${existing ? esc(existing.fullText) : ''}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Lucky Item (optional):</label>
+      <input type="text" id="h_luckyItem" value="${existing ? esc(existing.luckyItem) : ''}" placeholder="e.g. That stainless steel garbage can">
+    </div>
+    <div style="margin-top:15px">
+      <button class="btn btn-primary" id="hSaveBtn">${existing ? 'Save Changes' : 'Publish'}</button>
+      <button class="btn" id="hCancelBtn" style="margin-left:10px">Cancel</button>
+      ${existing ? `<button class="btn btn-danger" id="hDeleteBtn" style="margin-left:10px">Delete</button>` : ''}
+    </div>
+    <div id="hFormMsg"></div>
+  `;
+
+  document.getElementById('hCancelBtn').addEventListener('click', () => {
+    formArea.style.display = 'none';
+    grid.style.display = '';
+  });
+
+  if (existing) {
+    document.getElementById('hDeleteBtn').addEventListener('click', async () => {
+      if (!confirm(`Delete ${signMeta.name} horoscope for ${period}?`)) return;
+      try {
+        await apiDelete('/admin/horoscopes/' + existing.id, adminPassword);
+        formArea.style.display = 'none';
+        grid.style.display = '';
+        onSave();
+      } catch (err) {
+        document.getElementById('hFormMsg').innerHTML = `<div class="msg-error">delete failed: ${esc(err.message)}</div>`;
+      }
+    });
+  }
+
+  document.getElementById('hSaveBtn').addEventListener('click', async () => {
+    const data = {
+      fullText: document.getElementById('h_fullText').value.trim(),
+      luckyItem: document.getElementById('h_luckyItem').value.trim(),
+    };
+    if (!data.fullText) {
+      document.getElementById('hFormMsg').innerHTML = '<div class="msg-error">reading text is required.</div>';
+      return;
+    }
+    try {
+      if (existing) {
+        await apiPut('/admin/horoscopes/' + existing.id, data, adminPassword);
+      } else {
+        await apiPost('/admin/horoscopes', { sign, period, ...data }, adminPassword);
+      }
+      formArea.style.display = 'none';
+      grid.style.display = '';
+      onSave();
+    } catch (err) {
+      document.getElementById('hFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+    }
+  });
+}
+
 // --- SETTINGS FORM ---
 async function renderSettingsForm() {
   const panel = document.getElementById('adminSettingsPanel');
@@ -2152,6 +2497,8 @@ async function route() {
     renderNews();
   } else if (path.startsWith('#/news/')) {
     renderNewsItem(path.replace('#/news/', ''));
+  } else if (path === '#/horoscopes') {
+    renderHoroscopes();
   } else if (path === '#/contact') {
     renderContact();
   } else if (path === '#/darkweb') {
