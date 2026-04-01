@@ -43,6 +43,9 @@ async def lifespan(app: FastAPI):
     await db.jobs.create_index("category")
     await db.jobs.create_index([("sortOrder", 1)])
     await db.jobs.create_index([("postedDate", -1)])
+    await db.news.create_index("category")
+    await db.news.create_index([("sortOrder", 1)])
+    await db.news.create_index([("postedDate", -1)])
     # Seed if empty
     count = await db.listings.count_documents({})
     if count == 0:
@@ -126,6 +129,25 @@ class JobUpdate(BaseModel):
     salary: Optional[str] = None
     fullText: Optional[str] = None
     category: Optional[str] = None
+
+
+class NewsCreate(BaseModel):
+    title: str
+    headline: str = ""
+    fullText: str
+    category: str  # local, crime, weird, opinion, weather, sports, announcements
+    author: str = "Staff Reporter"
+    location: str = "Colorado Springs, CO"
+    postedDate: Optional[str] = None
+
+
+class NewsUpdate(BaseModel):
+    title: Optional[str] = None
+    headline: Optional[str] = None
+    fullText: Optional[str] = None
+    category: Optional[str] = None
+    author: Optional[str] = None
+    location: Optional[str] = None
 
 
 # --- Helpers ---
@@ -525,6 +547,107 @@ async def reorder_jobs(request: Request, password: str = Query(...)):
     return {"ok": True}
 
 
+# --- News Routes ---
+
+def news_to_dict(item) -> dict:
+    return {
+        "id": str(item["_id"]),
+        "title": item["title"],
+        "headline": item.get("headline", ""),
+        "fullText": item["fullText"],
+        "category": item["category"],
+        "author": item.get("author", "Staff Reporter"),
+        "location": item.get("location", "Colorado Springs, CO"),
+        "postedDate": item["postedDate"].isoformat() if isinstance(item["postedDate"], datetime) else item["postedDate"],
+        "sortOrder": item.get("sortOrder", 999),
+    }
+
+
+@app.get("/api/news")
+async def get_news(category: Optional[str] = Query(None)):
+    query = {}
+    if category and category != "all":
+        query["category"] = category
+    cursor = db.news.find(query).sort("sortOrder", 1)
+    items = await cursor.to_list(length=200)
+    return [news_to_dict(n) for n in items]
+
+
+@app.get("/api/news/{news_id}")
+async def get_news_item(news_id: str):
+    if not ObjectId.is_valid(news_id):
+        raise HTTPException(status_code=404, detail="Article not found")
+    item = await db.news.find_one({"_id": ObjectId(news_id)})
+    if not item:
+        raise HTTPException(status_code=404, detail="Article not found")
+    return news_to_dict(item)
+
+
+@app.post("/api/admin/news")
+async def create_news(item: NewsCreate, password: str = Query(...)):
+    verify_admin(password)
+    now = datetime.utcnow()
+    doc = item.dict()
+    if doc.get("postedDate"):
+        try:
+            doc["postedDate"] = datetime.fromisoformat(doc["postedDate"])
+        except (ValueError, TypeError):
+            doc["postedDate"] = now
+    else:
+        doc["postedDate"] = now
+    doc["createdAt"] = now
+    doc["updatedAt"] = now
+    max_order = await db.news.find_one(sort=[("sortOrder", -1)])
+    doc["sortOrder"] = (max_order.get("sortOrder", 0) + 1) if max_order else 0
+    result = await db.news.insert_one(doc)
+    created = await db.news.find_one({"_id": result.inserted_id})
+    return news_to_dict(created)
+
+
+@app.put("/api/admin/news/{news_id}")
+async def update_news(news_id: str, updates: NewsUpdate, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(news_id):
+        raise HTTPException(status_code=404, detail="Article not found")
+    update_data = {k: v for k, v in updates.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update_data["updatedAt"] = datetime.utcnow()
+    result = await db.news.update_one(
+        {"_id": ObjectId(news_id)},
+        {"$set": update_data}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Article not found")
+    updated = await db.news.find_one({"_id": ObjectId(news_id)})
+    return news_to_dict(updated)
+
+
+@app.delete("/api/admin/news/{news_id}")
+async def delete_news(news_id: str, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(news_id):
+        raise HTTPException(status_code=404, detail="Article not found")
+    result = await db.news.delete_one({"_id": ObjectId(news_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Article not found")
+    return {"ok": True, "deleted": news_id}
+
+
+@app.put("/api/admin/reorder-news")
+async def reorder_news(request: Request, password: str = Query(...)):
+    verify_admin(password)
+    data = await request.json()
+    order = data.get("order", [])
+    for i, nid in enumerate(order):
+        if ObjectId.is_valid(nid):
+            await db.news.update_one(
+                {"_id": ObjectId(nid)},
+                {"$set": {"sortOrder": i}}
+            )
+    return {"ok": True}
+
+
 # --- Seed Data ---
 
 async def seed_initial_data():
@@ -616,6 +739,10 @@ async def export_all(password: str = Query(...)):
     async for doc in db.jobs.find().sort("sortOrder", 1):
         doc["_id"] = str(doc["_id"])
         jobs.append(doc)
+    news = []
+    async for doc in db.news.find().sort("sortOrder", 1):
+        doc["_id"] = str(doc["_id"])
+        news.append(doc)
     settings_doc = await db.settings.find_one({"_id": "site"})
     if settings_doc:
         settings_doc["_id"] = str(settings_doc["_id"])
@@ -625,6 +752,7 @@ async def export_all(password: str = Query(...)):
         "listings": listings,
         "missed_connections": missed_connections,
         "jobs": jobs,
+        "news": news,
         "settings": settings_doc
     }
 

@@ -480,6 +480,7 @@ function navHTML(extra) {
       <a href="#/">for sale</a>
       <a href="#/missed-connections">missed connections</a>
       <a href="#/jobs">jobs</a>
+      <a href="#/news">community news</a>
       <a href="#/about">about</a>
       <a href="#/contact">contact</a>
       <a href="${esc(S.liveMarketplaceUrl || '#/darkweb')}" ${(S.liveMarketplaceUrl && !S.liveMarketplaceUrl.startsWith('#')) ? 'target="_blank" rel="noopener noreferrer"' : ''}>${esc(S.liveMarketplaceLabel || 'live marketplace')}</a>
@@ -866,6 +867,130 @@ async function renderJob(id) {
   ` + footerHTML();
 }
 
+// --- COMMUNITY NEWS PAGE ---
+async function renderNews() {
+  const app = document.getElementById('app');
+  const hash = location.hash;
+  const catMatch = hash.match(/[?&]cat=([^&]+)/);
+  let selectedCat = catMatch ? decodeURIComponent(catMatch[1]) : 'all';
+
+  app.innerHTML = headerHTML('colorado springs > community news') + navHTML() + `<div class="loading">loading the news...</div>` + footerHTML();
+
+  let items = [];
+  try {
+    const catParam = selectedCat !== 'all' ? `?category=${encodeURIComponent(selectedCat)}` : '';
+    items = await apiGet('/news' + catParam);
+  } catch (e) {
+    app.innerHTML = headerHTML('colorado springs > community news') + navHTML() +
+      `<div style="padding:20px;text-align:center;color:#cc0000">failed to load news. the local media has collapsed.</div>` +
+      footerHTML();
+    return;
+  }
+
+  const newsCats = [
+    {id: 'all', name: 'all news'},
+    {id: 'local', name: 'local'},
+    {id: 'crime', name: 'crime & safety'},
+    {id: 'weird', name: 'weird'},
+    {id: 'opinion', name: 'opinion'},
+    {id: 'weather', name: 'weather'},
+    {id: 'sports', name: 'sports'},
+    {id: 'announcements', name: 'announcements'},
+  ];
+
+  const sidebarLinks = newsCats.map(c =>
+    `<a href="#/news${c.id !== 'all' ? '?cat=' + c.id : ''}" class="${selectedCat === c.id ? 'active' : ''}">${c.name}</a>`
+  ).join('');
+
+  const listHTML = items.length > 0 ? items.map(n => `
+    <div class="listing-row">
+      <div class="listing-info">
+        <div class="listing-title">
+          <a href="#/news/${n.id}">${esc(n.title)}</a>
+        </div>
+        ${n.headline ? `<div class="listing-meta" style="color:#333;font-style:italic">${esc(n.headline)}</div>` : ''}
+        <div class="listing-meta">${esc(n.author)} &mdash; ${esc(n.location)} &mdash; ${formatDate(n.postedDate)}</div>
+        <div class="listing-meta" style="color:#666">${esc(n.category)}</div>
+        <div class="listing-actions">
+          <a href="#/news/${n.id}">read full story</a>
+        </div>
+      </div>
+    </div>
+  `).join('') : `
+    <div style="padding:20px;text-align:center;color:#666666">
+      no stories in this category.<br>nothing happened here. nothing ever does.
+    </div>`;
+
+  app.innerHTML = headerHTML('colorado springs > community news') + navHTML() + `
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-box">
+          <strong>sections</strong>
+          <div class="sidebar-links">${sidebarLinks}</div>
+        </div>
+        <div class="sidebar-box">
+          <div class="safety-tips" style="font-style:italic;color:#666">
+            all news is local<br>all local news is surreal<br>all surreal news is this
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="content-intro">
+          <strong>COMMUNITY NEWS</strong> - colorado springs area<br>
+          <span class="tagline">(${items.length} stor${items.length !== 1 ? 'ies' : 'y'} | journalism is not dead, it is merely confused)</span>
+        </div>
+        ${listHTML}
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
+// --- NEWS DETAIL ---
+async function renderNewsItem(id) {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML('colorado springs > community news') + navHTML() + `<div class="loading">loading article...</div>` + footerHTML();
+
+  let item;
+  try {
+    item = await apiGet('/news/' + id);
+  } catch (e) {
+    app.innerHTML = headerHTML('colorado springs > community news') + navHTML() + `
+      <div class="not-found">
+        <h2>article not found</h2>
+        <p>this story has been retracted, misplaced, or never happened in the first place.</p>
+        <a href="#/news">&larr; return to news</a>
+      </div>` + footerHTML();
+    return;
+  }
+
+  app.innerHTML = headerHTML('colorado springs > community news') + `
+    <div class="craigslist-nav">
+      <a href="#/news">&larr; back to news</a>
+      <a href="#/">for sale</a>
+      <a href="#/about">about</a>
+      <span style="float:right;font-size:11px">search tips | posting guidelines</span>
+    </div>
+    <div class="listing-detail">
+      <div class="listing-detail-title">${esc(item.title)}</div>
+      ${item.headline ? `<div style="font-size:14px;font-style:italic;color:#333;margin-bottom:10px">${esc(item.headline)}</div>` : ''}
+      <div class="listing-detail-meta">
+        <table><tbody>
+          <tr><td><strong>by:</strong></td><td>${esc(item.author)}</td></tr>
+          <tr><td><strong>location:</strong></td><td>${esc(item.location)}</td></tr>
+          <tr><td><strong>section:</strong></td><td>${esc(item.category)}</td></tr>
+          <tr><td><strong>published:</strong></td><td>${formatDate(item.postedDate)}</td></tr>
+        </tbody></table>
+      </div>
+      <div class="listing-detail-description">${esc(item.fullText)}</div>
+      <div class="page-nav">
+        <a href="#/news">&larr; back to news</a> |
+        <a href="#/">for sale</a> |
+        <a href="#/about">about this project</a>
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
 // --- ABOUT PAGE ---
 function renderAbout() {
   const processItems = (S.aboutProcess || '').split('\n').filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('');
@@ -1110,6 +1235,7 @@ async function renderAdmin() {
         <button class="btn" id="tabListings" style="font-weight:bold">Listings</button>
         <button class="btn" id="tabMC" style="margin-left:10px">Missed Connections</button>
         <button class="btn" id="tabJobs" style="margin-left:10px">Jobs</button>
+        <button class="btn" id="tabNews" style="margin-left:10px">News</button>
         <button class="btn" id="tabSettings" style="margin-left:10px">Site Settings</button>
       </div>
       <div id="adminListingsPanel">
@@ -1121,6 +1247,7 @@ async function renderAdmin() {
       </div>
       <div id="adminMCPanel" style="display:none"></div>
       <div id="adminJobsPanel" style="display:none"></div>
+      <div id="adminNewsPanel" style="display:none"></div>
       <div id="adminSettingsPanel" style="display:none"></div>
     </div>
   ` + footerHTML();
@@ -1130,16 +1257,19 @@ async function renderAdmin() {
     document.getElementById('adminListingsPanel').style.display = tab === 'listings' ? '' : 'none';
     document.getElementById('adminMCPanel').style.display = tab === 'mc' ? '' : 'none';
     document.getElementById('adminJobsPanel').style.display = tab === 'jobs' ? '' : 'none';
+    document.getElementById('adminNewsPanel').style.display = tab === 'news' ? '' : 'none';
     document.getElementById('adminSettingsPanel').style.display = tab === 'settings' ? '' : 'none';
     document.getElementById('tabListings').style.fontWeight = tab === 'listings' ? 'bold' : 'normal';
     document.getElementById('tabMC').style.fontWeight = tab === 'mc' ? 'bold' : 'normal';
     document.getElementById('tabJobs').style.fontWeight = tab === 'jobs' ? 'bold' : 'normal';
+    document.getElementById('tabNews').style.fontWeight = tab === 'news' ? 'bold' : 'normal';
     document.getElementById('tabSettings').style.fontWeight = tab === 'settings' ? 'bold' : 'normal';
   }
 
   document.getElementById('tabListings').addEventListener('click', () => showTab('listings'));
   document.getElementById('tabMC').addEventListener('click', () => { showTab('mc'); renderMCAdmin(); });
   document.getElementById('tabJobs').addEventListener('click', () => { showTab('jobs'); renderJobsAdmin(); });
+  document.getElementById('tabNews').addEventListener('click', () => { showTab('news'); renderNewsAdmin(); });
   document.getElementById('tabSettings').addEventListener('click', () => { showTab('settings'); renderSettingsForm(); });
 
   document.getElementById('logoutBtn').addEventListener('click', (e) => {
@@ -1479,6 +1609,147 @@ function showJobForm(existing) {
       renderJobsAdmin();
     } catch (err) {
       document.getElementById('jobFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+    }
+  });
+}
+
+// --- NEWS ADMIN ---
+async function renderNewsAdmin() {
+  const panel = document.getElementById('adminNewsPanel');
+  panel.innerHTML = `
+    <div style="margin-bottom:15px">
+      <button class="btn btn-primary" id="newNewsBtn">+ new article</button>
+    </div>
+    <div id="newsList"><div class="loading">loading...</div></div>
+    <div id="newsForm" style="display:none"></div>
+  `;
+
+  document.getElementById('newNewsBtn').addEventListener('click', () => showNewsForm());
+
+  try {
+    const items = await apiGet('/news');
+    const container = document.getElementById('newsList');
+    if (items.length === 0) {
+      container.innerHTML = '<div style="color:#666;padding:10px">no articles yet. the news cycle is empty.</div>';
+      return;
+    }
+    container.innerHTML = items.map((n, idx) => `
+      <div class="admin-listing-row drag-row" draggable="true" data-id="${n.id}" data-idx="${idx}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="drag-handle">&#9776;</span>
+          <span style="color:#999;font-size:11px;min-width:20px">${idx + 1}.</span>
+          <div>
+            <strong>${esc(n.title)}</strong>
+            <span style="font-size:11px;color:#666;margin-left:5px">(${esc(n.category)}) &mdash; ${esc(n.author)}</span>
+          </div>
+        </div>
+        <div class="actions">
+          <a href="#" class="news-edit-btn" data-id="${n.id}">edit</a>
+          <a href="#" class="news-delete-btn btn-danger" data-id="${n.id}" data-title="${esc(n.title)}">delete</a>
+        </div>
+      </div>
+    `).join('');
+
+    setupDragDrop(container, items.map(n => n.id), '/admin/reorder-news', () => renderNewsAdmin());
+
+    container.querySelectorAll('.news-edit-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const item = await apiGet('/news/' + btn.dataset.id);
+        showNewsForm(item);
+      });
+    });
+
+    container.querySelectorAll('.news-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (confirm(`Delete "${btn.dataset.title}"? This cannot be undone.`)) {
+          try {
+            await apiDelete('/admin/news/' + btn.dataset.id, adminPassword);
+            renderNewsAdmin();
+          } catch (err) { alert('Delete failed: ' + err.message); }
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById('newsList').innerHTML = `<div class="msg-error">failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+function showNewsForm(existing) {
+  const isEdit = !!existing;
+  const form = document.getElementById('newsForm');
+  form.style.display = 'block';
+  document.getElementById('newsList').style.display = 'none';
+  document.getElementById('newNewsBtn').style.display = 'none';
+
+  const catOptions = ['local', 'crime', 'weird', 'opinion', 'weather', 'sports', 'announcements'].map(c =>
+    `<option value="${c}" ${existing && existing.category === c ? 'selected' : ''}>${c}</option>`
+  ).join('');
+
+  form.innerHTML = `
+    <h2 style="font-size:16px;margin-bottom:15px">${isEdit ? 'Edit' : 'New'} Article</h2>
+    <div class="form-group">
+      <label>Headline:</label>
+      <input type="text" id="n_title" value="${existing ? esc(existing.title) : ''}" placeholder="e.g. LOCAL MAN SELLS CHAIR, QUESTIONS GRAVITY">
+    </div>
+    <div class="form-group">
+      <label>Subhead / Lede (optional):</label>
+      <input type="text" id="n_headline" value="${existing ? esc(existing.headline) : ''}" placeholder="e.g. neighbors unsurprised; chair described as 'probably haunted'">
+    </div>
+    <div class="form-group">
+      <label>Author / Byline:</label>
+      <input type="text" id="n_author" value="${existing ? esc(existing.author) : 'Staff Reporter'}" placeholder="e.g. Staff Reporter">
+    </div>
+    <div class="form-group">
+      <label>Location:</label>
+      <input type="text" id="n_location" value="${existing ? esc(existing.location) : 'Colorado Springs, CO'}">
+    </div>
+    <div class="form-group">
+      <label>Section:</label>
+      <select id="n_category">${catOptions}</select>
+    </div>
+    <div class="form-group">
+      <label>Full Story:</label>
+      <textarea id="n_fullText" rows="10" placeholder="Write the article here...">${existing ? esc(existing.fullText) : ''}</textarea>
+    </div>
+    <div style="margin-top:15px">
+      <button class="btn btn-primary" id="newsSaveBtn">${isEdit ? 'Save Changes' : 'Publish'}</button>
+      <button class="btn" id="newsCancelBtn" style="margin-left:10px">Cancel</button>
+    </div>
+    <div id="newsFormMsg"></div>
+  `;
+
+  document.getElementById('newsCancelBtn').addEventListener('click', () => {
+    form.style.display = 'none';
+    document.getElementById('newsList').style.display = '';
+    document.getElementById('newNewsBtn').style.display = '';
+  });
+
+  document.getElementById('newsSaveBtn').addEventListener('click', async () => {
+    const data = {
+      title: document.getElementById('n_title').value.trim(),
+      headline: document.getElementById('n_headline').value.trim(),
+      author: document.getElementById('n_author').value.trim(),
+      location: document.getElementById('n_location').value.trim(),
+      category: document.getElementById('n_category').value,
+      fullText: document.getElementById('n_fullText').value.trim(),
+    };
+
+    if (!data.title || !data.fullText) {
+      document.getElementById('newsFormMsg').innerHTML = '<div class="msg-error">headline and full story are required.</div>';
+      return;
+    }
+
+    try {
+      if (isEdit) {
+        await apiPut('/admin/news/' + existing.id, data, adminPassword);
+      } else {
+        await apiPost('/admin/news', data, adminPassword);
+      }
+      renderNewsAdmin();
+    } catch (err) {
+      document.getElementById('newsFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
     }
   });
 }
@@ -1877,6 +2148,10 @@ async function route() {
     renderJobs();
   } else if (path.startsWith('#/jobs/')) {
     renderJob(path.replace('#/jobs/', ''));
+  } else if (path === '#/news') {
+    renderNews();
+  } else if (path.startsWith('#/news/')) {
+    renderNewsItem(path.replace('#/news/', ''));
   } else if (path === '#/contact') {
     renderContact();
   } else if (path === '#/darkweb') {
