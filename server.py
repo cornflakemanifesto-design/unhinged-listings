@@ -83,6 +83,7 @@ class ListingCreate(BaseModel):
     category: str
     location: str = "Colorado Springs, CO"
     postedDate: Optional[str] = None  # ISO date string, defaults to now
+    isDraft: bool = False
 
 
 class ListingUpdate(BaseModel):
@@ -95,6 +96,7 @@ class ListingUpdate(BaseModel):
     facebookUrl: Optional[str] = None
     category: Optional[str] = None
     location: Optional[str] = None
+    isDraft: Optional[bool] = None
 
 
 class AdminAuth(BaseModel):
@@ -106,12 +108,14 @@ class MissedConnectionCreate(BaseModel):
     fullText: str
     location: str = "Colorado Springs, CO"
     postedDate: Optional[str] = None
+    isDraft: bool = False
 
 
 class MissedConnectionUpdate(BaseModel):
     title: Optional[str] = None
     fullText: Optional[str] = None
     location: Optional[str] = None
+    isDraft: Optional[bool] = None
 
 
 class JobCreate(BaseModel):
@@ -122,6 +126,7 @@ class JobCreate(BaseModel):
     fullText: str
     category: str  # full-time, part-time, gig, internship, volunteer, unclear
     postedDate: Optional[str] = None
+    isDraft: bool = False
 
 
 class JobUpdate(BaseModel):
@@ -131,6 +136,7 @@ class JobUpdate(BaseModel):
     salary: Optional[str] = None
     fullText: Optional[str] = None
     category: Optional[str] = None
+    isDraft: Optional[bool] = None
 
 
 class NewsCreate(BaseModel):
@@ -141,6 +147,7 @@ class NewsCreate(BaseModel):
     author: str = "Staff Reporter"
     location: str = "Colorado Springs, CO"
     postedDate: Optional[str] = None
+    isDraft: bool = False
 
 
 class NewsUpdate(BaseModel):
@@ -150,6 +157,7 @@ class NewsUpdate(BaseModel):
     category: Optional[str] = None
     author: Optional[str] = None
     location: Optional[str] = None
+    isDraft: Optional[bool] = None
 
 
 ZODIAC_SIGNS = [
@@ -164,11 +172,13 @@ class HoroscopeCreate(BaseModel):
     fullText: str
     luckyItem: str = ""
     postedDate: Optional[str] = None
+    isDraft: bool = False
 
 
 class HoroscopeUpdate(BaseModel):
     fullText: Optional[str] = None
     luckyItem: Optional[str] = None
+    isDraft: Optional[bool] = None
 
 
 # --- Helpers ---
@@ -188,6 +198,7 @@ def listing_to_dict(listing) -> dict:
         "postedDate": listing["postedDate"].isoformat() if isinstance(listing["postedDate"], datetime) else listing["postedDate"],
         "createdAt": listing.get("createdAt", listing["postedDate"]).isoformat() if isinstance(listing.get("createdAt", listing["postedDate"]), datetime) else str(listing.get("createdAt", "")),
         "sortOrder": listing.get("sortOrder", 999),
+        "isDraft": listing.get("isDraft", False),
     }
 
 
@@ -199,10 +210,12 @@ def verify_admin(password: str):
 # --- API Routes ---
 
 @app.get("/api/listings")
-async def get_listings(category: Optional[str] = Query(None)):
+async def get_listings(category: Optional[str] = Query(None), password: Optional[str] = Query(None)):
     query = {}
     if category and category != "all":
         query["category"] = category
+    if password != ADMIN_PASSWORD:
+        query["isDraft"] = {"$ne": True}
     cursor = db.listings.find(query).sort("sortOrder", 1)
     listings = await cursor.to_list(length=200)
     return [listing_to_dict(l) for l in listings]
@@ -382,12 +395,14 @@ def mc_to_dict(mc) -> dict:
         "location": mc.get("location", "Colorado Springs, CO"),
         "postedDate": mc["postedDate"].isoformat() if isinstance(mc["postedDate"], datetime) else mc["postedDate"],
         "sortOrder": mc.get("sortOrder", 999),
+        "isDraft": mc.get("isDraft", False),
     }
 
 
 @app.get("/api/missed-connections")
-async def get_missed_connections():
-    cursor = db.missed_connections.find().sort("sortOrder", 1)
+async def get_missed_connections(password: Optional[str] = Query(None)):
+    query = {} if password == ADMIN_PASSWORD else {"isDraft": {"$ne": True}}
+    cursor = db.missed_connections.find(query).sort("sortOrder", 1)
     items = await cursor.to_list(length=200)
     return [mc_to_dict(m) for m in items]
 
@@ -480,14 +495,17 @@ def job_to_dict(job) -> dict:
         "category": job["category"],
         "postedDate": job["postedDate"].isoformat() if isinstance(job["postedDate"], datetime) else job["postedDate"],
         "sortOrder": job.get("sortOrder", 999),
+        "isDraft": job.get("isDraft", False),
     }
 
 
 @app.get("/api/jobs")
-async def get_jobs(category: Optional[str] = Query(None)):
+async def get_jobs(category: Optional[str] = Query(None), password: Optional[str] = Query(None)):
     query = {}
     if category and category != "all":
         query["category"] = category
+    if password != ADMIN_PASSWORD:
+        query["isDraft"] = {"$ne": True}
     cursor = db.jobs.find(query).sort("sortOrder", 1)
     items = await cursor.to_list(length=200)
     return [job_to_dict(j) for j in items]
@@ -581,14 +599,17 @@ def news_to_dict(item) -> dict:
         "location": item.get("location", "Colorado Springs, CO"),
         "postedDate": item["postedDate"].isoformat() if isinstance(item["postedDate"], datetime) else item["postedDate"],
         "sortOrder": item.get("sortOrder", 999),
+        "isDraft": item.get("isDraft", False),
     }
 
 
 @app.get("/api/news")
-async def get_news(category: Optional[str] = Query(None)):
+async def get_news(category: Optional[str] = Query(None), password: Optional[str] = Query(None)):
     query = {}
     if category and category != "all":
         query["category"] = category
+    if password != ADMIN_PASSWORD:
+        query["isDraft"] = {"$ne": True}
     cursor = db.news.find(query).sort("sortOrder", 1)
     items = await cursor.to_list(length=200)
     return [news_to_dict(n) for n in items]
@@ -679,14 +700,17 @@ def horoscope_to_dict(item) -> dict:
         "fullText": item["fullText"],
         "luckyItem": item.get("luckyItem", ""),
         "postedDate": item["postedDate"].isoformat() if isinstance(item["postedDate"], datetime) else item["postedDate"],
+        "isDraft": item.get("isDraft", False),
     }
 
 
 @app.get("/api/horoscopes")
-async def get_horoscopes(period: Optional[str] = Query(None)):
+async def get_horoscopes(period: Optional[str] = Query(None), password: Optional[str] = Query(None)):
     query = {}
     if period:
         query["period"] = period
+    if password != ADMIN_PASSWORD:
+        query["isDraft"] = {"$ne": True}
     # Return in zodiac sign order
     cursor = db.horoscopes.find(query)
     items = await cursor.to_list(length=200)

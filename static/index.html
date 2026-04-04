@@ -346,6 +346,13 @@ async function apiGet(path) {
   return r.json();
 }
 
+async function apiAdminGet(path, password) {
+  const sep = path.includes('?') ? '&' : '?';
+  const r = await fetch(API + path + sep + 'password=' + encodeURIComponent(password));
+  if (!r.ok) throw new Error(`API error ${r.status}`);
+  return r.json();
+}
+
 async function apiPost(path, data, password) {
   const url = password ? `${API}${path}?password=${encodeURIComponent(password)}` : `${API}${path}`;
   const r = await fetch(url, {
@@ -1479,7 +1486,7 @@ async function renderAdmin() {
 
   // Load listings
   try {
-    const listings = await apiGet('/listings');
+    const listings = await apiAdminGet('/listings', adminPassword);
     const container = document.getElementById('adminListings');
     if (listings.length === 0) {
       container.innerHTML = '<div style="color:#666;padding:10px">no listings yet. add one above.</div>';
@@ -1493,6 +1500,7 @@ async function renderAdmin() {
           <div>
             <strong>${esc(l.title)}</strong> — $${l.price}
             <span class="${statusClass(l.status)}" style="font-size:11px;margin-left:5px">(${l.status})</span>
+            ${l.isDraft ? '<span style="color:#cc6600;font-size:11px;font-weight:bold;margin-left:5px">[draft]</span>' : ''}
           </div>
         </div>
         <div class="actions">
@@ -1545,7 +1553,7 @@ async function renderMCAdmin() {
   document.getElementById('newMCBtn').addEventListener('click', () => showMCForm());
 
   try {
-    const items = await apiGet('/missed-connections');
+    const items = await apiAdminGet('/missed-connections', adminPassword);
     const container = document.getElementById('mcList');
     if (items.length === 0) {
       container.innerHTML = '<div style="color:#666;padding:10px">no missed connections yet. the longing awaits.</div>';
@@ -1557,6 +1565,7 @@ async function renderMCAdmin() {
           <span class="drag-handle">&#9776;</span>
           <span style="color:#999;font-size:11px;min-width:20px">${idx + 1}.</span>
           <strong>${esc(m.title)}</strong>
+          ${m.isDraft ? '<span style="color:#cc6600;font-size:11px;font-weight:bold;margin-left:5px">[draft]</span>' : ''}
         </div>
         <div class="actions">
           <a href="#" class="mc-edit-btn" data-id="${m.id}">edit</a>
@@ -1614,7 +1623,8 @@ function showMCForm(existing) {
       <textarea id="mc_fullText" placeholder="Pour your heart out here...">${existing ? esc(existing.fullText) : ''}</textarea>
     </div>
     <div style="margin-top:15px">
-      <button class="btn btn-primary" id="mcSaveBtn">${isEdit ? 'Save Changes' : 'Create'}</button>
+      <button class="btn btn-primary" id="mcSaveBtn">${isEdit ? (existing.isDraft ? 'Publish' : 'Save Changes') : 'Publish'}</button>
+      <button class="btn" id="mcDraftBtn" style="margin-left:10px;color:#cc6600">${isEdit && existing.isDraft ? 'Keep as Draft' : 'Save as Draft'}</button>
       <button class="btn" id="mcCancelBtn" style="margin-left:10px">Cancel</button>
     </div>
     <div id="mcFormMsg"></div>
@@ -1626,11 +1636,12 @@ function showMCForm(existing) {
     document.getElementById('newMCBtn').style.display = '';
   });
 
-  document.getElementById('mcSaveBtn').addEventListener('click', async () => {
+  async function submitMC(isDraft) {
     const data = {
       title: document.getElementById('mc_title').value.trim(),
       location: document.getElementById('mc_location').value.trim(),
       fullText: document.getElementById('mc_fullText').value.trim(),
+      isDraft: isDraft,
     };
 
     if (!data.title || !data.fullText) {
@@ -1648,7 +1659,9 @@ function showMCForm(existing) {
     } catch (err) {
       document.getElementById('mcFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
     }
-  });
+  }
+  document.getElementById('mcSaveBtn').addEventListener('click', () => submitMC(false));
+  document.getElementById('mcDraftBtn').addEventListener('click', () => submitMC(true));
 }
 
 // --- JOBS ADMIN ---
@@ -1665,7 +1678,7 @@ async function renderJobsAdmin() {
   document.getElementById('newJobBtn').addEventListener('click', () => showJobForm());
 
   try {
-    const items = await apiGet('/jobs');
+    const items = await apiAdminGet('/jobs', adminPassword);
     const container = document.getElementById('jobList');
     if (items.length === 0) {
       container.innerHTML = '<div style="color:#666;padding:10px">no jobs yet. the economy is empty.</div>';
@@ -1679,6 +1692,7 @@ async function renderJobsAdmin() {
           <div>
             <strong>${esc(j.title)}</strong> &mdash; ${esc(j.company)}
             <span style="font-size:11px;color:#666;margin-left:5px">(${esc(j.category)})</span>
+            ${j.isDraft ? '<span style="color:#cc6600;font-size:11px;font-weight:bold;margin-left:5px">[draft]</span>' : ''}
           </div>
         </div>
         <div class="actions">
@@ -1752,7 +1766,8 @@ function showJobForm(existing) {
       <textarea id="j_fullText" placeholder="Describe the position here...">${existing ? esc(existing.fullText) : ''}</textarea>
     </div>
     <div style="margin-top:15px">
-      <button class="btn btn-primary" id="jobSaveBtn">${isEdit ? 'Save Changes' : 'Create'}</button>
+      <button class="btn btn-primary" id="jobSaveBtn">${isEdit ? (existing.isDraft ? 'Publish' : 'Save Changes') : 'Publish'}</button>
+      <button class="btn" id="jobDraftBtn" style="margin-left:10px;color:#cc6600">${isEdit && existing.isDraft ? 'Keep as Draft' : 'Save as Draft'}</button>
       <button class="btn" id="jobCancelBtn" style="margin-left:10px">Cancel</button>
     </div>
     <div id="jobFormMsg"></div>
@@ -1764,7 +1779,7 @@ function showJobForm(existing) {
     document.getElementById('newJobBtn').style.display = '';
   });
 
-  document.getElementById('jobSaveBtn').addEventListener('click', async () => {
+  async function submitJob(isDraft) {
     const data = {
       title: document.getElementById('j_title').value.trim(),
       company: document.getElementById('j_company').value.trim(),
@@ -1772,6 +1787,7 @@ function showJobForm(existing) {
       salary: document.getElementById('j_salary').value.trim(),
       category: document.getElementById('j_category').value,
       fullText: document.getElementById('j_fullText').value.trim(),
+      isDraft: isDraft,
     };
 
     if (!data.title || !data.company || !data.fullText) {
@@ -1789,7 +1805,9 @@ function showJobForm(existing) {
     } catch (err) {
       document.getElementById('jobFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
     }
-  });
+  }
+  document.getElementById('jobSaveBtn').addEventListener('click', () => submitJob(false));
+  document.getElementById('jobDraftBtn').addEventListener('click', () => submitJob(true));
 }
 
 // --- NEWS ADMIN ---
@@ -1806,7 +1824,7 @@ async function renderNewsAdmin() {
   document.getElementById('newNewsBtn').addEventListener('click', () => showNewsForm());
 
   try {
-    const items = await apiGet('/news');
+    const items = await apiAdminGet('/news', adminPassword);
     const container = document.getElementById('newsList');
     if (items.length === 0) {
       container.innerHTML = '<div style="color:#666;padding:10px">no articles yet. the news cycle is empty.</div>';
@@ -1820,6 +1838,7 @@ async function renderNewsAdmin() {
           <div>
             <strong>${esc(n.title)}</strong>
             <span style="font-size:11px;color:#666;margin-left:5px">(${esc(n.category)}) &mdash; ${esc(n.author)}</span>
+            ${n.isDraft ? '<span style="color:#cc6600;font-size:11px;font-weight:bold;margin-left:5px">[draft]</span>' : ''}
           </div>
         </div>
         <div class="actions">
@@ -1893,7 +1912,8 @@ function showNewsForm(existing) {
       <textarea id="n_fullText" rows="10" placeholder="Write the article here...">${existing ? esc(existing.fullText) : ''}</textarea>
     </div>
     <div style="margin-top:15px">
-      <button class="btn btn-primary" id="newsSaveBtn">${isEdit ? 'Save Changes' : 'Publish'}</button>
+      <button class="btn btn-primary" id="newsSaveBtn">${isEdit ? (existing.isDraft ? 'Publish' : 'Save Changes') : 'Publish'}</button>
+      <button class="btn" id="newsDraftBtn" style="margin-left:10px;color:#cc6600">${isEdit && existing.isDraft ? 'Keep as Draft' : 'Save as Draft'}</button>
       <button class="btn" id="newsCancelBtn" style="margin-left:10px">Cancel</button>
     </div>
     <div id="newsFormMsg"></div>
@@ -1905,7 +1925,7 @@ function showNewsForm(existing) {
     document.getElementById('newNewsBtn').style.display = '';
   });
 
-  document.getElementById('newsSaveBtn').addEventListener('click', async () => {
+  async function submitNews(isDraft) {
     const data = {
       title: document.getElementById('n_title').value.trim(),
       headline: document.getElementById('n_headline').value.trim(),
@@ -1913,6 +1933,7 @@ function showNewsForm(existing) {
       location: document.getElementById('n_location').value.trim(),
       category: document.getElementById('n_category').value,
       fullText: document.getElementById('n_fullText').value.trim(),
+      isDraft: isDraft,
     };
 
     if (!data.title || !data.fullText) {
@@ -1930,7 +1951,9 @@ function showNewsForm(existing) {
     } catch (err) {
       document.getElementById('newsFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
     }
-  });
+  }
+  document.getElementById('newsSaveBtn').addEventListener('click', () => submitNews(false));
+  document.getElementById('newsDraftBtn').addEventListener('click', () => submitNews(true));
 }
 
 // --- HOROSCOPES ADMIN ---
@@ -1999,7 +2022,7 @@ async function renderHoroscopesAdmin() {
   async function loadSignGrid(period) {
     const grid = document.getElementById('horoscopeSignGrid');
     let readings = [];
-    try { readings = await apiGet('/horoscopes?period=' + encodeURIComponent(period)); } catch (e) {}
+    try { readings = await apiAdminGet('/horoscopes?period=' + encodeURIComponent(period), adminPassword); } catch (e) {}
     const readingMap = {};
     for (const r of readings) readingMap[r.sign] = r;
 
@@ -2009,8 +2032,8 @@ async function renderHoroscopesAdmin() {
         <div class="horoscope-card" data-sign="${s.id}" style="cursor:pointer" title="${r ? 'click to edit' : 'click to add'}">
           <span class="horoscope-sign">${s.symbol}</span>
           <div class="horoscope-name">${esc(s.name)}</div>
-          <div class="horoscope-dates" style="${r ? 'color:#006600' : 'color:#cc6600'}">
-            ${r ? '✓ written' : '— empty'}
+          <div class="horoscope-dates" style="${r ? (r.isDraft ? 'color:#cc6600' : 'color:#006600') : 'color:#999'}">
+            ${r ? (r.isDraft ? '✎ draft' : '✓ published') : '— empty'}
           </div>
           ${r ? `<div style="font-size:10px;color:#666;margin-top:4px;overflow:hidden;max-height:30px">${esc(r.fullText.substring(0,60))}…</div>` : ''}
         </div>`;
@@ -2049,7 +2072,8 @@ function showHoroscopeForm(period, sign, existing, onSave) {
       <input type="text" id="h_luckyItem" value="${existing ? esc(existing.luckyItem) : ''}" placeholder="e.g. That stainless steel garbage can">
     </div>
     <div style="margin-top:15px">
-      <button class="btn btn-primary" id="hSaveBtn">${existing ? 'Save Changes' : 'Publish'}</button>
+      <button class="btn btn-primary" id="hSaveBtn">${existing ? (existing.isDraft ? 'Publish' : 'Save Changes') : 'Publish'}</button>
+      <button class="btn" id="hDraftBtn" style="margin-left:10px;color:#cc6600">${existing && existing.isDraft ? 'Keep as Draft' : 'Save as Draft'}</button>
       <button class="btn" id="hCancelBtn" style="margin-left:10px">Cancel</button>
       ${existing ? `<button class="btn btn-danger" id="hDeleteBtn" style="margin-left:10px">Delete</button>` : ''}
     </div>
@@ -2075,10 +2099,11 @@ function showHoroscopeForm(period, sign, existing, onSave) {
     });
   }
 
-  document.getElementById('hSaveBtn').addEventListener('click', async () => {
+  async function submitHoroscope(isDraft) {
     const data = {
       fullText: document.getElementById('h_fullText').value.trim(),
       luckyItem: document.getElementById('h_luckyItem').value.trim(),
+      isDraft: isDraft,
     };
     if (!data.fullText) {
       document.getElementById('hFormMsg').innerHTML = '<div class="msg-error">reading text is required.</div>';
@@ -2096,7 +2121,9 @@ function showHoroscopeForm(period, sign, existing, onSave) {
     } catch (err) {
       document.getElementById('hFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
     }
-  });
+  }
+  document.getElementById('hSaveBtn').addEventListener('click', () => submitHoroscope(false));
+  document.getElementById('hDraftBtn').addEventListener('click', () => submitHoroscope(true));
 }
 
 // --- SETTINGS FORM ---
@@ -2395,7 +2422,8 @@ function showListingForm(existing) {
       <div class="form-group"><label>Facebook Marketplace URL:</label><input type="text" id="f_facebookUrl" placeholder="https://www.facebook.com/marketplace/item/..."></div>
       <div class="form-group"><label>Full Text:</label><textarea id="f_fullText" placeholder="Paste the full ad text here."></textarea></div>
       <div style="margin-top:15px">
-        <button class="btn btn-primary" id="saveBtn">Create Listing</button>
+        <button class="btn btn-primary" id="saveBtn">Publish</button>
+        <button class="btn" id="draftBtn" style="margin-left:10px;color:#cc6600">Save as Draft</button>
         <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
       </div>
       <div id="formMsg"></div>
@@ -2407,7 +2435,7 @@ function showListingForm(existing) {
       document.getElementById('newListingBtn').style.display = '';
     });
 
-    document.getElementById('saveBtn').addEventListener('click', async () => {
+    async function submitListingNew(isDraft) {
       const title = document.getElementById('f_title').value.trim();
       const fullText = document.getElementById('f_fullText').value.trim();
       if (!title || !fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and full text are required.</div>'; return; }
@@ -2420,6 +2448,7 @@ function showListingForm(existing) {
         image: document.getElementById('f_image').value.trim(),
         facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
         fullText: fullText,
+        isDraft: isDraft,
       };
       try {
         await apiPost('/admin/listings', data, adminPassword);
@@ -2427,7 +2456,9 @@ function showListingForm(existing) {
       } catch (err) {
         document.getElementById('formMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
       }
-    });
+    }
+    document.getElementById('saveBtn').addEventListener('click', () => submitListingNew(false));
+    document.getElementById('draftBtn').addEventListener('click', () => submitListingNew(true));
 
   } else {
     form.innerHTML = `
@@ -2441,7 +2472,8 @@ function showListingForm(existing) {
       <div class="form-group"><label>Facebook Marketplace URL:</label><input type="text" id="f_facebookUrl" value="${esc(existing.facebookUrl)}"></div>
       <div class="form-group"><label>Full Text:</label><textarea id="f_fullText">${esc(existing.fullText)}</textarea></div>
       <div style="margin-top:15px">
-        <button class="btn btn-primary" id="saveBtn">Save Changes</button>
+        <button class="btn btn-primary" id="saveBtn">${existing.isDraft ? 'Publish' : 'Save Changes'}</button>
+        <button class="btn" id="draftBtn" style="margin-left:10px;color:#cc6600">${existing.isDraft ? 'Keep as Draft' : 'Save as Draft'}</button>
         <button class="btn" id="cancelBtn" style="margin-left:10px">Cancel</button>
       </div>
       <div id="formMsg"></div>
@@ -2453,7 +2485,7 @@ function showListingForm(existing) {
       document.getElementById('newListingBtn').style.display = '';
     });
 
-    document.getElementById('saveBtn').addEventListener('click', async () => {
+    async function submitListingEdit(isDraft) {
       const data = {
         title: document.getElementById('f_title').value.trim(),
         price: parseFloat(document.getElementById('f_price').value) || 0,
@@ -2463,6 +2495,7 @@ function showListingForm(existing) {
         image: document.getElementById('f_image').value.trim(),
         facebookUrl: document.getElementById('f_facebookUrl').value.trim(),
         fullText: document.getElementById('f_fullText').value.trim(),
+        isDraft: isDraft,
       };
       if (!data.title || !data.fullText) { document.getElementById('formMsg').innerHTML = '<div class="msg-error">title and full text are required.</div>'; return; }
       try {
@@ -2471,7 +2504,9 @@ function showListingForm(existing) {
       } catch (err) {
         document.getElementById('formMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
       }
-    });
+    }
+    document.getElementById('saveBtn').addEventListener('click', () => submitListingEdit(false));
+    document.getElementById('draftBtn').addEventListener('click', () => submitListingEdit(true));
   }
 }
 
