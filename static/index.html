@@ -2516,8 +2516,7 @@ function renderBSOD() {
   const fakeHex = (len) => Math.floor(Math.random() * Math.pow(16, len)).toString(16).toUpperCase().padStart(len, '0');
   const addr = () => fakeHex(4) + ':' + fakeHex(8);
   const stop1 = fakeHex(8), stop2 = fakeHex(8), stop3 = fakeHex(8), stop4 = fakeHex(8);
-  const baseAddr = fakeHex(8);
-  const stamp = fakeHex(8);
+  const baseAddr = fakeHex(8), stamp = fakeHex(8);
 
   const stopCodes = [
     'PAGE_FAULT_IN_CONSUMER_CAPITALISM',
@@ -2530,6 +2529,10 @@ function renderBSOD() {
     'FATAL_ERROR_IN_DECISION_MAKING_SUBSYSTEM',
   ];
   const code = stopCodes[Math.floor(Math.random() * stopCodes.length)];
+
+  // Win9x button style helpers
+  const btnUp   = '1px 1px 0 #ffffff, -1px -1px 0 #808080, 1px -1px 0 #808080, -1px 1px 0 #ffffff, inset 1px 1px 0 #dfdfdf';
+  const btnDown = 'inset 1px 1px 0 #808080, inset -1px -1px 0 #ffffff';
 
   app.innerHTML = `
     <div style="background:#000080;color:#c0c0c0;font-family:'Courier New',Courier,monospace;font-size:14px;line-height:1.6;min-height:100vh;padding:0;margin:-10px;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;overflow:auto;box-sizing:border-box">
@@ -2578,36 +2581,71 @@ function renderBSOD() {
         <p style="margin:0 0 4px">Beginning dump of physical memory</p>
         <p style="margin:0 0 4px">${[...Array(4)].map(() => [...Array(8)].map(() => fakeHex(8)).join(' ')).join('<br>')}</p>
         <p style="margin:12px 0 4px">Physical memory dump complete.</p>
-        <p style="margin:0 0 20px">Contact your system administrator or technical support group for further<br>assistance.</p>
+        <p style="margin:0 0 0">Contact your system administrator or technical support group for further assistance.</p>
+      </div>
+    </div>
 
-        <p style="margin:0 0 20px" id="bsod-anykey">Press any key to continue <span id="bsod-cursor" style="background:#c0c0c0;color:#000080">&nbsp;</span></p>
-
-        <p style="margin:20px 0 0;color:#ffffff;font-style:italic" id="bsod-punchline"></p>
+    <!-- Win9x dialog — hidden until setTimeout -->
+    <div id="bsod-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:10000;display:flex;align-items:center;justify-content:center">
+      <div id="bsod-dialog" style="width:360px;background:#c0c0c0;border:2px solid;border-color:#ffffff #808080 #808080 #ffffff;box-shadow:1px 1px 0 #000;font-family:Arial,sans-serif;font-size:12px;color:#000000">
+        <!-- title bar -->
+        <div style="background:#000080;color:#ffffff;font-weight:bold;font-size:12px;padding:3px 5px;display:flex;justify-content:space-between;align-items:center;user-select:none">
+          <span>Unhinged Listings</span>
+          <span style="background:#c0c0c0;color:#000;border:1px solid;border-color:#fff #808080 #808080 #fff;width:16px;height:14px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;cursor:default">&#x2715;</span>
+        </div>
+        <!-- body -->
+        <div id="bsod-dialog-body" style="padding:18px 16px 12px">
+          <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:16px">
+            <div style="font-size:32px;line-height:1;flex-shrink:0">&#9888;</div>
+            <div style="line-height:1.5">
+              UNHINGED.EXE has caused a general protection fault<br>
+              in module <strong>CURIOSITY.DLL</strong> at ${fakeHex(4)}:${fakeHex(8)}.<br><br>
+              Click <strong>OK</strong> to close this dialog.
+            </div>
+          </div>
+          <div style="text-align:center">
+            <button id="bsod-ok" style="width:75px;height:23px;background:#c0c0c0;border:2px solid;border-color:#ffffff #808080 #808080 #ffffff;font-family:Arial,sans-serif;font-size:12px;cursor:pointer;box-shadow:${btnUp}">OK</button>
+          </div>
+        </div>
       </div>
     </div>
   `;
 
-  // Blinking cursor
-  const cursor = document.getElementById('bsod-cursor');
-  const cursorInterval = setInterval(() => { cursor.style.visibility = cursor.style.visibility === 'hidden' ? 'visible' : 'hidden'; }, 530);
+  // Show dialog after a beat — let them stew in the blue for a moment
+  const overlay = document.getElementById('bsod-overlay');
+  setTimeout(() => { overlay.style.display = 'flex'; }, 1500);
 
-  // Type in the punchline after a delay
-  const punchline = 'you just couldn\'t resist, could you?  i\'m not mad.  just disappointed.';
-  const punchEl = document.getElementById('bsod-punchline');
-  let i = 0;
-  setTimeout(() => {
-    const typeInterval = setInterval(() => {
-      punchEl.textContent += punchline[i++];
-      if (i >= punchline.length) {
-        clearInterval(typeInterval);
-        // After punchline finishes, clicking or pressing a key exits
-        const exit = () => { clearInterval(cursorInterval); location.hash = '#/'; };
-        document.addEventListener('keydown', exit, { once: true });
-        document.getElementById('bsod-anykey').style.cursor = 'pointer';
-        document.getElementById('bsod-anykey').addEventListener('click', exit);
-      }
-    }, 40);
-  }, 2200);
+  const threshold = Math.random() < 0.5 ? 3 : 4;
+  let clicks = 0;
+
+  document.getElementById('bsod-ok').addEventListener('click', function() {
+    clicks++;
+    if (clicks < threshold) {
+      // Visually depress the button but do nothing
+      this.style.borderColor = '#808080 #ffffff #ffffff #808080';
+      this.style.boxShadow = btnDown;
+      this.style.paddingTop = '2px';
+      const btn = this;
+      setTimeout(() => {
+        btn.style.borderColor = '#ffffff #808080 #808080 #ffffff';
+        btn.style.boxShadow = btnUp;
+        btn.style.paddingTop = '';
+      }, 120);
+    } else {
+      // Punchline
+      document.getElementById('bsod-dialog-body').innerHTML = `
+        <div style="padding:10px 4px 16px;line-height:2;text-align:center">
+          You just had to click it.<br>
+          Couldn't help yourself.<br>
+          I'm not mad. Just disappointed.
+        </div>
+        <div style="text-align:center">
+          <button id="bsod-ok-final" style="width:75px;height:23px;background:#c0c0c0;border:2px solid;border-color:#ffffff #808080 #808080 #ffffff;font-family:Arial,sans-serif;font-size:12px;cursor:pointer;box-shadow:${btnUp}">OK</button>
+        </div>
+      `;
+      document.getElementById('bsod-ok-final').addEventListener('click', () => { location.hash = '#/'; });
+    }
+  });
 }
 
 // ===== ROUTER =====
