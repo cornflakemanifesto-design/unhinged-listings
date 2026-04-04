@@ -2513,68 +2513,101 @@ function showListingForm(existing) {
 // --- BSOD ---
 function renderBSOD() {
   const app = document.getElementById('app');
+  const fakeHex = (len) => Math.floor(Math.random() * Math.pow(16, len)).toString(16).toUpperCase().padStart(len, '0');
+  const addr = () => fakeHex(4) + ':' + fakeHex(8);
+  const stop1 = fakeHex(8), stop2 = fakeHex(8), stop3 = fakeHex(8), stop4 = fakeHex(8);
+  const baseAddr = fakeHex(8);
+  const stamp = fakeHex(8);
+
   const stopCodes = [
-    'EXISTENTIAL_CRISIS_IN_NONPAGED_AREA',
-    'IRQL_NOT_LESS_OR_EQUAL_TO_ZERO_MEANING_OF_LIFE',
-    'KERNEL_SECURITY_CHECK_FAILURE_TO_LAUNCH',
     'PAGE_FAULT_IN_CONSUMER_CAPITALISM',
+    'IRQL_NOT_LESS_OR_EQUAL_TO_YOUR_EXPECTATIONS',
+    'UNEXPECTED_KERNEL_MODE_EXISTENTIAL_TRAP',
     'DRIVER_OVERRAN_STACK_BUFFER_OF_DESPAIR',
-    'CRITICAL_PROCESS_DIED_AS_WE_ALL_WILL',
-    'UNEXPECTED_STORE_EXCEPTION_AT_FACEBOOK_MARKETPLACE',
-    'SYSTEM_THREAD_NOT_HANDLED_BECAUSE_WHY_WOULD_IT_BE',
-    'BAD_POOL_CALLER_TURNED_OUT_TO_BE_ME',
     'MEMORY_MANAGEMENT_IS_A_METAPHOR',
+    'BAD_POOL_CALLER_TURNED_OUT_TO_BE_YOU',
+    'EXCEPTION_IN_NONPAGED_MARKETPLACE_AREA',
+    'FATAL_ERROR_IN_DECISION_MAKING_SUBSYSTEM',
   ];
   const code = stopCodes[Math.floor(Math.random() * stopCodes.length)];
-  const fakeHex = () => '0x' + Math.floor(Math.random() * 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0');
 
   app.innerHTML = `
-    <div id="bsod-screen" style="background:#0078d7;color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;padding:0;margin:-10px;display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;box-sizing:border-box">
-      <div style="max-width:680px;padding:40px 60px">
-        <div style="font-size:120px;line-height:1;margin-bottom:20px">:(</div>
-        <div style="font-size:22px;font-weight:400;margin-bottom:30px;line-height:1.4">
-          Your PC ran into a problem and needs to restart.<br>
-          We're just collecting some error info, and then<br>
-          we'll restart for you.
-        </div>
-        <div style="font-size:36px;font-weight:700;margin-bottom:30px" id="bsod-pct">0% complete</div>
-        <div style="font-size:13px;margin-bottom:40px;line-height:1.8;opacity:0.85">
-          For more information about this issue and possible fixes, visit<br>
-          <span style="text-decoration:underline">https://unhingedlistings.com/errors/you-should-not-have-clicked-that</span>
-        </div>
-        <div style="font-size:13px;margin-bottom:8px">If you call a support person, give them this info:</div>
-        <div style="font-size:13px;opacity:0.75">Stop code: <strong>${code}</strong></div>
-        <div style="font-size:11px;opacity:0.5;margin-top:4px">${fakeHex()} ${fakeHex()} ${fakeHex()} ${fakeHex()}</div>
-        <div style="margin-top:40px;font-size:12px;opacity:0.6" id="bsod-back"></div>
+    <div style="background:#000080;color:#c0c0c0;font-family:'Courier New',Courier,monospace;font-size:14px;line-height:1.6;min-height:100vh;padding:0;margin:-10px;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;overflow:auto;box-sizing:border-box">
+      <div style="max-width:740px;margin:0 auto;padding:30px 20px">
+
+        <div style="background:#c0c0c0;color:#000080;padding:2px 8px;display:inline-block;margin-bottom:20px;font-weight:bold;font-size:14px">Windows</div>
+
+        <p style="margin:0 0 16px">A fatal exception 0E has occurred at ${addr()} in VxD VMM(04) +<br>
+        ${fakeHex(8)}. The current application will be terminated.</p>
+
+        <p style="margin:0 0 6px">&bull;&nbsp; Press any key to terminate the current application.</p>
+        <p style="margin:0 0 6px">&bull;&nbsp; Press CTRL+ALT+DEL again to restart your computer. You will<br>
+        &nbsp;&nbsp;&nbsp;lose any unsaved information in all applications.</p>
+
+        <p style="margin:16px 0">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+        <p style="margin:0 0 4px;color:#ffffff">*** STOP: 0x0000${stop1} (0x${stop2}, 0x${stop3}, 0x00000000, 0x${stop4})</p>
+        <p style="margin:0 0 16px;color:#ffffff">${code}</p>
+
+        <p style="margin:0 0 12px">If this is the first time you've seen this Stop error screen,<br>
+        restart your computer. If this screen appears again, follow<br>
+        these steps:</p>
+
+        <p style="margin:0 0 12px">Check to make sure any new hardware or software is properly installed.<br>
+        If this is a new installation, ask your hardware or software manufacturer<br>
+        for any Windows updates you might need.</p>
+
+        <p style="margin:0 0 12px">If problems continue, disable or remove any newly installed hardware<br>
+        or software. Disable BIOS memory options such as caching or shadowing.<br>
+        If you need to use Safe Mode to remove or disable components, restart<br>
+        your computer, press F8 to select Advanced Startup Options, and then<br>
+        select Safe Mode.</p>
+
+        <p style="margin:16px 0">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+        <p style="margin:0 0 4px">Technical information:</p>
+        <p style="margin:0 0 4px;color:#ffffff">*** STOP: 0x0000000A (0x${fakeHex(8)}, 0x00000002, 0x00000001, 0x${fakeHex(8)})</p>
+        <p style="margin:0 0 16px;color:#ffffff">    ${code}</p>
+
+        <p style="margin:0 0 4px;color:#ffffff">*** ADDRESS 0x${baseAddr} base at 0x${fakeHex(8)}, DateStamp ${stamp} - ntoskrnl.exe</p>
+        <p style="margin:0 0 4px;color:#ffffff">*** ADDRESS 0x${fakeHex(8)} base at 0x${fakeHex(8)}, DateStamp ${fakeHex(8)} - win32k.sys</p>
+        <p style="margin:0 0 4px;color:#ffffff">*** ADDRESS 0x${fakeHex(8)} base at 0x${fakeHex(8)}, DateStamp ${fakeHex(8)} - hal.dll</p>
+
+        <p style="margin:16px 0">&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</p>
+
+        <p style="margin:0 0 4px">Beginning dump of physical memory</p>
+        <p style="margin:0 0 4px">${[...Array(4)].map(() => [...Array(8)].map(() => fakeHex(8)).join(' ')).join('<br>')}</p>
+        <p style="margin:12px 0 4px">Physical memory dump complete.</p>
+        <p style="margin:0 0 20px">Contact your system administrator or technical support group for further<br>assistance.</p>
+
+        <p style="margin:0 0 20px" id="bsod-anykey">Press any key to continue <span id="bsod-cursor" style="background:#c0c0c0;color:#000080">&nbsp;</span></p>
+
+        <p style="margin:20px 0 0;color:#ffffff;font-style:italic" id="bsod-punchline"></p>
       </div>
     </div>
   `;
 
-  // Animate the percentage
-  let pct = 0;
-  const pctEl = document.getElementById('bsod-pct');
-  const backEl = document.getElementById('bsod-back');
-  const interval = setInterval(() => {
-    pct += Math.floor(Math.random() * 4) + 1;
-    if (pct >= 100) {
-      pct = 100;
-      clearInterval(interval);
-      pctEl.textContent = '100% complete';
-      let countdown = 5;
-      backEl.textContent = `restarting in ${countdown} seconds...`;
-      const timer = setInterval(() => {
-        countdown--;
-        if (countdown <= 0) {
-          clearInterval(timer);
-          location.hash = '#/';
-        } else {
-          backEl.textContent = `restarting in ${countdown} second${countdown !== 1 ? 's' : ''}...`;
-        }
-      }, 1000);
-    } else {
-      pctEl.textContent = pct + '% complete';
-    }
-  }, 80);
+  // Blinking cursor
+  const cursor = document.getElementById('bsod-cursor');
+  const cursorInterval = setInterval(() => { cursor.style.visibility = cursor.style.visibility === 'hidden' ? 'visible' : 'hidden'; }, 530);
+
+  // Type in the punchline after a delay
+  const punchline = 'you just couldn\'t resist, could you?  i\'m not mad.  just disappointed.';
+  const punchEl = document.getElementById('bsod-punchline');
+  let i = 0;
+  setTimeout(() => {
+    const typeInterval = setInterval(() => {
+      punchEl.textContent += punchline[i++];
+      if (i >= punchline.length) {
+        clearInterval(typeInterval);
+        // After punchline finishes, clicking or pressing a key exits
+        const exit = () => { clearInterval(cursorInterval); location.hash = '#/'; };
+        document.addEventListener('keydown', exit, { once: true });
+        document.getElementById('bsod-anykey').style.cursor = 'pointer';
+        document.getElementById('bsod-anykey').addEventListener('click', exit);
+      }
+    }, 40);
+  }, 2200);
 }
 
 // ===== ROUTER =====
