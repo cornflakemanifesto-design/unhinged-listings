@@ -528,7 +528,7 @@ function navHTML(extra) {
       <a href="#/contact">contact</a>
       <a href="${esc(S.liveMarketplaceUrl || '#/darkweb')}" ${(S.liveMarketplaceUrl && !S.liveMarketplaceUrl.startsWith('#')) ? 'target="_blank" rel="noopener noreferrer"' : ''}>${esc(S.liveMarketplaceLabel || 'live marketplace')}</a>
       ${extra || ''}
-      <span style="float:right;font-size:11px">search tips | posting guidelines</span>
+      <span style="float:right;font-size:11px">search tips | posting guidelines | <a href="#/bsod" style="color:#cc0000;font-size:11px">do not click here</a></span>
     </div>`;
 }
 
@@ -2510,6 +2510,73 @@ function showListingForm(existing) {
   }
 }
 
+// --- BSOD ---
+function renderBSOD() {
+  const app = document.getElementById('app');
+  const stopCodes = [
+    'EXISTENTIAL_CRISIS_IN_NONPAGED_AREA',
+    'IRQL_NOT_LESS_OR_EQUAL_TO_ZERO_MEANING_OF_LIFE',
+    'KERNEL_SECURITY_CHECK_FAILURE_TO_LAUNCH',
+    'PAGE_FAULT_IN_CONSUMER_CAPITALISM',
+    'DRIVER_OVERRAN_STACK_BUFFER_OF_DESPAIR',
+    'CRITICAL_PROCESS_DIED_AS_WE_ALL_WILL',
+    'UNEXPECTED_STORE_EXCEPTION_AT_FACEBOOK_MARKETPLACE',
+    'SYSTEM_THREAD_NOT_HANDLED_BECAUSE_WHY_WOULD_IT_BE',
+    'BAD_POOL_CALLER_TURNED_OUT_TO_BE_ME',
+    'MEMORY_MANAGEMENT_IS_A_METAPHOR',
+  ];
+  const code = stopCodes[Math.floor(Math.random() * stopCodes.length)];
+  const fakeHex = () => '0x' + Math.floor(Math.random() * 0xFFFFFFFF).toString(16).toUpperCase().padStart(8, '0');
+
+  app.innerHTML = `
+    <div id="bsod-screen" style="background:#0078d7;color:#ffffff;font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;padding:0;margin:-10px;display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;box-sizing:border-box">
+      <div style="max-width:680px;padding:40px 60px">
+        <div style="font-size:120px;line-height:1;margin-bottom:20px">:(</div>
+        <div style="font-size:22px;font-weight:400;margin-bottom:30px;line-height:1.4">
+          Your PC ran into a problem and needs to restart.<br>
+          We're just collecting some error info, and then<br>
+          we'll restart for you.
+        </div>
+        <div style="font-size:36px;font-weight:700;margin-bottom:30px" id="bsod-pct">0% complete</div>
+        <div style="font-size:13px;margin-bottom:40px;line-height:1.8;opacity:0.85">
+          For more information about this issue and possible fixes, visit<br>
+          <span style="text-decoration:underline">https://unhingedlistings.com/errors/you-should-not-have-clicked-that</span>
+        </div>
+        <div style="font-size:13px;margin-bottom:8px">If you call a support person, give them this info:</div>
+        <div style="font-size:13px;opacity:0.75">Stop code: <strong>${code}</strong></div>
+        <div style="font-size:11px;opacity:0.5;margin-top:4px">${fakeHex()} ${fakeHex()} ${fakeHex()} ${fakeHex()}</div>
+        <div style="margin-top:40px;font-size:12px;opacity:0.6" id="bsod-back"></div>
+      </div>
+    </div>
+  `;
+
+  // Animate the percentage
+  let pct = 0;
+  const pctEl = document.getElementById('bsod-pct');
+  const backEl = document.getElementById('bsod-back');
+  const interval = setInterval(() => {
+    pct += Math.floor(Math.random() * 4) + 1;
+    if (pct >= 100) {
+      pct = 100;
+      clearInterval(interval);
+      pctEl.textContent = '100% complete';
+      let countdown = 5;
+      backEl.textContent = `restarting in ${countdown} seconds...`;
+      const timer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+          clearInterval(timer);
+          location.hash = '#/';
+        } else {
+          backEl.textContent = `restarting in ${countdown} second${countdown !== 1 ? 's' : ''}...`;
+        }
+      }, 1000);
+    } else {
+      pctEl.textContent = pct + '% complete';
+    }
+  }, 80);
+}
+
 // ===== ROUTER =====
 async function route() {
   if (!S) await loadSettings();
@@ -2538,6 +2605,8 @@ async function route() {
     renderContact();
   } else if (path === '#/darkweb') {
     renderDarkWeb();
+  } else if (path === '#/bsod') {
+    renderBSOD();
   } else if (path === '#/about') {
     renderAbout();
   } else if (path === '#/admin') {
