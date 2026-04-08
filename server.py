@@ -48,6 +48,8 @@ async def lifespan(app: FastAPI):
     await db.news.create_index([("postedDate", -1)])
     await db.horoscopes.create_index([("sign", 1), ("period", 1)], unique=True)
     await db.horoscopes.create_index([("period", -1)])
+    await db.deer_abbott.create_index([("sortOrder", 1)])
+    await db.deer_abbott.create_index([("postedDate", -1)])
     # Seed if empty
     count = await db.listings.count_documents({})
     if count == 0:
@@ -164,6 +166,23 @@ ZODIAC_SIGNS = [
     "aries", "taurus", "gemini", "cancer", "leo", "virgo",
     "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"
 ]
+
+
+class DeerAbbottCreate(BaseModel):
+    subject: str
+    letter: str
+    letterFrom: str = "Anonymous"
+    response: str
+    postedDate: Optional[str] = None
+    isDraft: bool = False
+
+
+class DeerAbbottUpdate(BaseModel):
+    subject: Optional[str] = None
+    letter: Optional[str] = None
+    letterFrom: Optional[str] = None
+    response: Optional[str] = None
+    isDraft: Optional[bool] = None
 
 
 class HoroscopeCreate(BaseModel):
@@ -797,6 +816,104 @@ async def delete_horoscope(horoscope_id: str, password: str = Query(...)):
     return {"ok": True, "deleted": horoscope_id}
 
 
+# --- Deer Abbott Routes ---
+
+def deer_abbott_to_dict(item) -> dict:
+    return {
+        "id": str(item["_id"]),
+        "subject": item["subject"],
+        "letter": item["letter"],
+        "letterFrom": item.get("letterFrom", "Anonymous"),
+        "response": item["response"],
+        "postedDate": item["postedDate"].isoformat() if isinstance(item["postedDate"], datetime) else item["postedDate"],
+        "sortOrder": item.get("sortOrder", 999),
+        "isDraft": item.get("isDraft", False),
+    }
+
+
+@app.get("/api/deer-abbott")
+async def get_deer_abbott(password: Optional[str] = Query(None)):
+    query = {} if password == ADMIN_PASSWORD else {"isDraft": {"$ne": True}}
+    cursor = db.deer_abbott.find(query).sort("sortOrder", 1)
+    items = await cursor.to_list(length=200)
+    return [deer_abbott_to_dict(i) for i in items]
+
+
+@app.get("/api/deer-abbott/{item_id}")
+async def get_deer_abbott_item(item_id: str):
+    if not ObjectId.is_valid(item_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    item = await db.deer_abbott.find_one({"_id": ObjectId(item_id)})
+    if not item:
+        raise HTTPException(status_code=404, detail="Not found")
+    return deer_abbott_to_dict(item)
+
+
+@app.post("/api/admin/deer-abbott")
+async def create_deer_abbott(item: DeerAbbottCreate, password: str = Query(...)):
+    verify_admin(password)
+    now = datetime.utcnow()
+    doc = item.dict()
+    if doc.get("postedDate"):
+        try:
+            doc["postedDate"] = datetime.fromisoformat(doc["postedDate"])
+        except (ValueError, TypeError):
+            doc["postedDate"] = now
+    else:
+        doc["postedDate"] = now
+    doc["createdAt"] = now
+    doc["updatedAt"] = now
+    max_order = await db.deer_abbott.find_one(sort=[("sortOrder", -1)])
+    doc["sortOrder"] = (max_order.get("sortOrder", 0) + 1) if max_order else 0
+    result = await db.deer_abbott.insert_one(doc)
+    created = await db.deer_abbott.find_one({"_id": result.inserted_id})
+    return deer_abbott_to_dict(created)
+
+
+@app.put("/api/admin/deer-abbott/{item_id}")
+async def update_deer_abbott(item_id: str, updates: DeerAbbottUpdate, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(item_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    update_data = {k: v for k, v in updates.dict().items() if v is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    update_data["updatedAt"] = datetime.utcnow()
+    result = await db.deer_abbott.update_one(
+        {"_id": ObjectId(item_id)},
+        {"$set": update_data}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    updated = await db.deer_abbott.find_one({"_id": ObjectId(item_id)})
+    return deer_abbott_to_dict(updated)
+
+
+@app.delete("/api/admin/deer-abbott/{item_id}")
+async def delete_deer_abbott(item_id: str, password: str = Query(...)):
+    verify_admin(password)
+    if not ObjectId.is_valid(item_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    result = await db.deer_abbott.delete_one({"_id": ObjectId(item_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {"ok": True, "deleted": item_id}
+
+
+@app.put("/api/admin/reorder-deer-abbott")
+async def reorder_deer_abbott(request: Request, password: str = Query(...)):
+    verify_admin(password)
+    data = await request.json()
+    order = data.get("order", [])
+    for i, iid in enumerate(order):
+        if ObjectId.is_valid(iid):
+            await db.deer_abbott.update_one(
+                {"_id": ObjectId(iid)},
+                {"$set": {"sortOrder": i}}
+            )
+    return {"ok": True}
+
+
 # --- Seed Data ---
 
 async def seed_initial_data():
@@ -896,6 +1013,10 @@ async def export_all(password: str = Query(...)):
     async for doc in db.horoscopes.find().sort([("period", -1), ("sign", 1)]):
         doc["_id"] = str(doc["_id"])
         horoscopes.append(doc)
+    deer_abbott = []
+    async for doc in db.deer_abbott.find().sort("sortOrder", 1):
+        doc["_id"] = str(doc["_id"])
+        deer_abbott.append(doc)
     settings_doc = await db.settings.find_one({"_id": "site"})
     if settings_doc:
         settings_doc["_id"] = str(settings_doc["_id"])
@@ -907,6 +1028,7 @@ async def export_all(password: str = Query(...)):
         "jobs": jobs,
         "news": news,
         "horoscopes": horoscopes,
+        "deer_abbott": deer_abbott,
         "settings": settings_doc
     }
 

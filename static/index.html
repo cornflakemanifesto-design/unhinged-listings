@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>unhinged listings</title>
 <meta name="description" content="where mundane commerce meets existential dread">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8N5BY4SFCH"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-8N5BY4SFCH', { page_path: location.pathname + location.hash });
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -322,6 +330,47 @@ textarea { resize: vertical; }
 .horoscope-period-bar select { margin-left: 5px; }
 .horoscope-period-bar .no-periods { color: #999; font-style: italic; }
 
+.deer-abbott-masthead {
+  border: 2px solid #000;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  text-align: center;
+  background: #f8f8f8;
+}
+.deer-abbott-masthead .da-name { font-size: 22px; font-weight: bold; letter-spacing: 1px; }
+.deer-abbott-masthead .da-sub { font-size: 11px; color: #555; font-style: italic; margin-top: 3px; }
+.deer-abbott-entry {
+  border-bottom: 1px solid #cccccc;
+  padding: 16px 0;
+}
+.deer-abbott-subject { font-size: 14px; font-weight: bold; margin-bottom: 4px; }
+.deer-abbott-byline { font-size: 11px; color: #666; font-style: italic; margin-bottom: 10px; }
+.deer-abbott-letter {
+  background: #fafafa;
+  border-left: 3px solid #aaaaaa;
+  padding: 10px 14px;
+  font-style: italic;
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.deer-abbott-letter-salutation { font-style: normal; font-weight: bold; display: block; margin-bottom: 6px; }
+.deer-abbott-letter-sign { font-style: normal; display: block; margin-top: 8px; }
+.deer-abbott-response {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  font-size: 12px;
+}
+.deer-abbott-response-sig {
+  display: block;
+  text-align: right;
+  font-style: italic;
+  margin-top: 10px;
+  font-size: 11px;
+  color: #333;
+}
+
 @media (max-width: 700px) {
   .main-layout { flex-direction: column; }
   .sidebar { width: 100%; }
@@ -524,11 +573,12 @@ function navHTML(extra) {
       <a href="#/jobs">jobs</a>
       <a href="#/news">community news</a>
       <a href="#/horoscopes">horoscopes</a>
+      <a href="#/deer-abbott">deer abbott</a>
       <a href="#/about">about</a>
       <a href="#/contact">contact</a>
       <a href="${esc(S.liveMarketplaceUrl || '#/darkweb')}" ${(S.liveMarketplaceUrl && !S.liveMarketplaceUrl.startsWith('#')) ? 'target="_blank" rel="noopener noreferrer"' : ''}>${esc(S.liveMarketplaceLabel || 'live marketplace')}</a>
       ${extra || ''}
-      <span style="float:right;font-size:11px">search tips | posting guidelines | <a href="#/bsod" style="color:#cc0000;font-size:11px">do not click here</a></span>
+      <span style="float:right;font-size:11px">search tips | posting guidelines</span>
     </div>`;
 }
 
@@ -536,7 +586,8 @@ function footerHTML() {
   return `
     <div class="craigslist-footer">
       &copy; ${new Date().getFullYear()} ${esc(S.footerText)}<br>
-      <span class="footer-links">${esc(S.footerLinks)}</span>
+      <span class="footer-links">${esc(S.footerLinks)}</span><br>
+      <span style="font-size:10px;color:#999999"><a href="#/bsod" style="color:#999999">do not click here</a></span>
     </div>`;
 }
 
@@ -1172,6 +1223,102 @@ async function renderHoroscopes() {
   });
 }
 
+// --- DEER ABBOTT ---
+async function renderDeerAbbott() {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML('colorado springs > deer abbott') + navHTML() + `<div class="loading">consulting the deer...</div>` + footerHTML();
+
+  let items = [];
+  try {
+    items = await apiGet('/deer-abbott');
+  } catch (e) { /* empty */ }
+
+  const entriesHTML = items.length === 0
+    ? `<div style="color:#666;font-style:italic;padding:20px 0">Deer Abbott has not yet received any letters. The hooves are idle. The forest is quiet.</div>`
+    : items.map(item => `
+      <div class="deer-abbott-entry">
+        <div class="deer-abbott-subject"><a href="#/deer-abbott/${item.id}">${esc(item.subject)}</a></div>
+        <div class="deer-abbott-byline">signed: ${esc(item.letterFrom)} &mdash; <span style="color:#999">${item.postedDate ? item.postedDate.substring(0,10) : ''}</span></div>
+        <div style="font-size:12px;color:#444;font-style:italic">${esc(item.letter.substring(0, 160))}${item.letter.length > 160 ? '&hellip;' : ''}</div>
+        <div style="margin-top:6px;font-size:12px"><a href="#/deer-abbott/${item.id}">read Deer Abbott's response &rarr;</a></div>
+      </div>`).join('');
+
+  app.innerHTML = headerHTML('colorado springs > deer abbott') + navHTML() + `
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-box">
+          <strong>Deer Abbott</strong>
+          <div class="sidebar-links" style="margin-top:6px;font-size:11px;line-height:1.7">
+            <a href="#/deer-abbott">all columns</a>
+          </div>
+        </div>
+        <div class="sidebar-box">
+          <div class="safety-tips" style="font-style:italic;color:#666">
+            Deer Abbott is a deer.<br>Her advice is not legally<br>binding. Do not attempt to<br>locate her in the wild.<br>She will not respond.
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="deer-abbott-masthead">
+          <div class="da-name">&#x1F98C; DEER ABBOTT &#x1F98C;</div>
+          <div class="da-sub">advice for the hopelessly confused &mdash; by a deer, for the people</div>
+        </div>
+        ${entriesHTML}
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
+async function renderDeerAbbottItem(id) {
+  const app = document.getElementById('app');
+  app.innerHTML = headerHTML('colorado springs > deer abbott') + navHTML() + `<div class="loading">consulting the deer...</div>` + footerHTML();
+
+  let item;
+  try {
+    item = await apiGet('/deer-abbott/' + id);
+  } catch (e) {
+    app.innerHTML = headerHTML('colorado springs > deer abbott') + navHTML() + `
+      <div style="padding:20px 0">
+        <div style="color:#cc0000">This letter has vanished. Even Deer Abbott cannot find it.</div>
+        <div style="margin-top:10px"><a href="#/deer-abbott">&larr; back to Deer Abbott</a></div>
+      </div>` + footerHTML();
+    return;
+  }
+
+  app.innerHTML = headerHTML('colorado springs > deer abbott') + navHTML() + `
+    <div class="main-layout">
+      <div class="sidebar">
+        <div class="sidebar-box">
+          <strong>Deer Abbott</strong>
+          <div class="sidebar-links" style="margin-top:6px;font-size:11px;line-height:1.7">
+            <a href="#/deer-abbott">&larr; all columns</a>
+          </div>
+        </div>
+        <div class="sidebar-box">
+          <div class="safety-tips" style="font-style:italic;color:#666">
+            Deer Abbott is a deer.<br>Her advice is not legally<br>binding. Do not attempt to<br>locate her in the wild.<br>She will not respond.
+          </div>
+        </div>
+      </div>
+      <div class="content">
+        <div class="deer-abbott-masthead">
+          <div class="da-name">&#x1F98C; DEER ABBOTT &#x1F98C;</div>
+          <div class="da-sub">advice for the hopelessly confused &mdash; by a deer, for the people</div>
+        </div>
+        <div class="deer-abbott-entry">
+          <div class="deer-abbott-subject">${esc(item.subject)}</div>
+          <div class="deer-abbott-byline">signed: ${esc(item.letterFrom)} &mdash; <span style="color:#999">${item.postedDate ? item.postedDate.substring(0,10) : ''}</span></div>
+          <div class="deer-abbott-letter">
+            <span class="deer-abbott-letter-salutation">Dear Deer Abbott,</span>${esc(item.letter)}<span class="deer-abbott-letter-sign">Signed, ${esc(item.letterFrom)}</span>
+          </div>
+          <div class="deer-abbott-response">${esc(item.response)}<span class="deer-abbott-response-sig">&#x1F43E;</span></div>
+        </div>
+        <div style="margin-top:20px;font-size:12px"><a href="#/deer-abbott">&larr; back to Deer Abbott</a></div>
+      </div>
+    </div>
+  ` + footerHTML();
+}
+
 // --- ABOUT PAGE ---
 function renderAbout() {
   const processItems = (S.aboutProcess || '').split('\n').filter(l => l.trim()).map(l => `<li>${esc(l.trim())}</li>`).join('');
@@ -1418,6 +1565,7 @@ async function renderAdmin() {
         <button class="btn" id="tabJobs" style="margin-left:10px">Jobs</button>
         <button class="btn" id="tabNews" style="margin-left:10px">News</button>
         <button class="btn" id="tabHoroscopes" style="margin-left:10px">Horoscopes</button>
+        <button class="btn" id="tabDeerAbbott" style="margin-left:10px">Deer Abbott</button>
         <button class="btn" id="tabSettings" style="margin-left:10px">Site Settings</button>
       </div>
       <div id="adminListingsPanel">
@@ -1431,6 +1579,7 @@ async function renderAdmin() {
       <div id="adminJobsPanel" style="display:none"></div>
       <div id="adminNewsPanel" style="display:none"></div>
       <div id="adminHoroscopesPanel" style="display:none"></div>
+      <div id="adminDeerAbbottPanel" style="display:none"></div>
       <div id="adminSettingsPanel" style="display:none"></div>
     </div>
   ` + footerHTML();
@@ -1442,12 +1591,14 @@ async function renderAdmin() {
     document.getElementById('adminJobsPanel').style.display = tab === 'jobs' ? '' : 'none';
     document.getElementById('adminNewsPanel').style.display = tab === 'news' ? '' : 'none';
     document.getElementById('adminHoroscopesPanel').style.display = tab === 'horoscopes' ? '' : 'none';
+    document.getElementById('adminDeerAbbottPanel').style.display = tab === 'deerabbott' ? '' : 'none';
     document.getElementById('adminSettingsPanel').style.display = tab === 'settings' ? '' : 'none';
     document.getElementById('tabListings').style.fontWeight = tab === 'listings' ? 'bold' : 'normal';
     document.getElementById('tabMC').style.fontWeight = tab === 'mc' ? 'bold' : 'normal';
     document.getElementById('tabJobs').style.fontWeight = tab === 'jobs' ? 'bold' : 'normal';
     document.getElementById('tabNews').style.fontWeight = tab === 'news' ? 'bold' : 'normal';
     document.getElementById('tabHoroscopes').style.fontWeight = tab === 'horoscopes' ? 'bold' : 'normal';
+    document.getElementById('tabDeerAbbott').style.fontWeight = tab === 'deerabbott' ? 'bold' : 'normal';
     document.getElementById('tabSettings').style.fontWeight = tab === 'settings' ? 'bold' : 'normal';
   }
 
@@ -1456,6 +1607,7 @@ async function renderAdmin() {
   document.getElementById('tabJobs').addEventListener('click', () => { showTab('jobs'); renderJobsAdmin(); });
   document.getElementById('tabNews').addEventListener('click', () => { showTab('news'); renderNewsAdmin(); });
   document.getElementById('tabHoroscopes').addEventListener('click', () => { showTab('horoscopes'); renderHoroscopesAdmin(); });
+  document.getElementById('tabDeerAbbott').addEventListener('click', () => { showTab('deerabbott'); renderDeerAbbottAdmin(); });
   document.getElementById('tabSettings').addEventListener('click', () => { showTab('settings'); renderSettingsForm(); });
 
   document.getElementById('logoutBtn').addEventListener('click', (e) => {
@@ -2126,6 +2278,136 @@ function showHoroscopeForm(period, sign, existing, onSave) {
   document.getElementById('hDraftBtn').addEventListener('click', () => submitHoroscope(true));
 }
 
+// --- DEER ABBOTT ADMIN ---
+async function renderDeerAbbottAdmin() {
+  const panel = document.getElementById('adminDeerAbbottPanel');
+  panel.innerHTML = `
+    <div style="margin-bottom:15px">
+      <button class="btn btn-primary" id="newDABtn">+ new column</button>
+    </div>
+    <div id="daList"><div class="loading">loading...</div></div>
+    <div id="daForm" style="display:none"></div>
+  `;
+
+  document.getElementById('newDABtn').addEventListener('click', () => showDeerAbbottForm());
+
+  try {
+    const items = await apiAdminGet('/deer-abbott', adminPassword);
+    const container = document.getElementById('daList');
+    if (items.length === 0) {
+      container.innerHTML = '<div style="color:#666;padding:10px">no columns yet. the deer awaits her first letter.</div>';
+      return;
+    }
+    container.innerHTML = items.map((item, idx) => `
+      <div class="admin-listing-row drag-row" draggable="true" data-id="${item.id}" data-idx="${idx}">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="drag-handle">&#9776;</span>
+          <span style="color:#999;font-size:11px;min-width:20px">${idx + 1}.</span>
+          <strong>${esc(item.subject)}</strong>
+          <span style="font-size:11px;color:#666;font-style:italic">&mdash; ${esc(item.letterFrom)}</span>
+          ${item.isDraft ? '<span style="color:#cc6600;font-size:11px;font-weight:bold;margin-left:5px">[draft]</span>' : ''}
+        </div>
+        <div class="actions">
+          <a href="#" class="da-edit-btn" data-id="${item.id}">edit</a>
+          <a href="#" class="da-delete-btn btn-danger" data-id="${item.id}" data-subject="${esc(item.subject)}">delete</a>
+        </div>
+      </div>
+    `).join('');
+
+    setupDragDrop(container, items.map(i => i.id), '/admin/reorder-deer-abbott', () => renderDeerAbbottAdmin());
+
+    container.querySelectorAll('.da-edit-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const item = await apiGet('/deer-abbott/' + btn.dataset.id);
+        showDeerAbbottForm(item);
+      });
+    });
+
+    container.querySelectorAll('.da-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (confirm(`Delete "${btn.dataset.subject}"? This cannot be undone.`)) {
+          try {
+            await apiDelete('/admin/deer-abbott/' + btn.dataset.id, adminPassword);
+            renderDeerAbbottAdmin();
+          } catch (err) { alert('Delete failed: ' + err.message); }
+        }
+      });
+    });
+  } catch (e) {
+    document.getElementById('daList').innerHTML = `<div class="msg-error">failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+function showDeerAbbottForm(existing) {
+  const isEdit = !!existing;
+  const form = document.getElementById('daForm');
+  form.style.display = 'block';
+  document.getElementById('daList').style.display = 'none';
+  document.getElementById('newDABtn').style.display = 'none';
+
+  form.innerHTML = `
+    <h2 style="font-size:16px;margin-bottom:15px">${isEdit ? 'Edit' : 'New'} Deer Abbott Column</h2>
+    <div class="form-group">
+      <label>Subject / Headline:</label>
+      <input type="text" id="da_subject" value="${existing ? esc(existing.subject) : ''}" placeholder="e.g. My Neighbor Won't Stop Leaving Corn Cobs In My Mailbox">
+    </div>
+    <div class="form-group">
+      <label>Signed By (pen name):</label>
+      <input type="text" id="da_letterFrom" value="${existing ? esc(existing.letterFrom) : ''}" placeholder="e.g. Baffled in Breckenridge">
+    </div>
+    <div class="form-group">
+      <label>Reader's Letter:</label>
+      <textarea id="da_letter" rows="8" placeholder="Dear Deer Abbott, I am writing to you because...">${existing ? esc(existing.letter) : ''}</textarea>
+    </div>
+    <div class="form-group">
+      <label>Deer Abbott's Response:</label>
+      <textarea id="da_response" rows="8" placeholder="Deer [Pen Name], I have consulted the forest on this matter...">${existing ? esc(existing.response) : ''}</textarea>
+    </div>
+    <div style="margin-top:15px">
+      <button class="btn btn-primary" id="daSaveBtn">${isEdit ? (existing.isDraft ? 'Publish' : 'Save Changes') : 'Publish'}</button>
+      <button class="btn" id="daDraftBtn" style="margin-left:10px;color:#cc6600">${isEdit && existing.isDraft ? 'Keep as Draft' : 'Save as Draft'}</button>
+      <button class="btn" id="daCancelBtn" style="margin-left:10px">Cancel</button>
+    </div>
+    <div id="daFormMsg"></div>
+  `;
+
+  document.getElementById('daCancelBtn').addEventListener('click', () => {
+    form.style.display = 'none';
+    document.getElementById('daList').style.display = '';
+    document.getElementById('newDABtn').style.display = '';
+  });
+
+  async function submitDA(isDraft) {
+    const data = {
+      subject: document.getElementById('da_subject').value.trim(),
+      letterFrom: document.getElementById('da_letterFrom').value.trim(),
+      letter: document.getElementById('da_letter').value.trim(),
+      response: document.getElementById('da_response').value.trim(),
+      isDraft: isDraft,
+    };
+
+    if (!data.subject || !data.letter || !data.response) {
+      document.getElementById('daFormMsg').innerHTML = '<div class="msg-error">subject, letter, and response are all required. the deer insists.</div>';
+      return;
+    }
+
+    try {
+      if (isEdit) {
+        await apiPut('/admin/deer-abbott/' + existing.id, data, adminPassword);
+      } else {
+        await apiPost('/admin/deer-abbott', data, adminPassword);
+      }
+      renderDeerAbbottAdmin();
+    } catch (err) {
+      document.getElementById('daFormMsg').innerHTML = `<div class="msg-error">save failed: ${esc(err.message)}</div>`;
+    }
+  }
+  document.getElementById('daSaveBtn').addEventListener('click', () => submitDA(false));
+  document.getElementById('daDraftBtn').addEventListener('click', () => submitDA(true));
+}
+
 // --- SETTINGS FORM ---
 async function renderSettingsForm() {
   const panel = document.getElementById('adminSettingsPanel');
@@ -2672,6 +2954,10 @@ async function route() {
     renderNewsItem(path.replace('#/news/', ''));
   } else if (path === '#/horoscopes') {
     renderHoroscopes();
+  } else if (path === '#/deer-abbott') {
+    renderDeerAbbott();
+  } else if (path.startsWith('#/deer-abbott/')) {
+    renderDeerAbbottItem(path.replace('#/deer-abbott/', ''));
   } else if (path === '#/contact') {
     renderContact();
   } else if (path === '#/darkweb') {
@@ -2686,6 +2972,7 @@ async function route() {
     renderHome();
   }
   window.scrollTo(0, 0);
+  if (typeof gtag !== 'undefined') gtag('event', 'page_view', { page_path: location.pathname + location.hash });
 }
 
 window.addEventListener('hashchange', route);
